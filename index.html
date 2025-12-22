@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Solar Roof Layout Tool</title>
+  <style>
+    html, body { height:100%; margin:0; font-family: Arial, sans-serif; }
+    #map { height:100%; width:100%; }
+    .panel{
+      position:absolute; top:12px; left:12px; z-index:5;
+      width:360px; background:rgba(255,255,255,0.95);
+      padding:12px; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.2);
+    }
+    input, button { width:100%; padding:10px; margin-top:8px; box-sizing:border-box; }
+    .hint { margin-top:8px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <b>Coordinates (lat, lng)</b>
+    <input id="coords" value="-1.2981371, 36.8907759" />
+    <button id="go">Go to location</button>
+    <button id="auto">Auto-detect roof tilt & azimuth</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    let map, marker;
+
+    function parseCoords() {
+      const raw = document.getElementById("coords").value.trim();
+      const p = raw.split(/[\s,]+/);
+      if (p.length < 2) return null;
+      const lat = parseFloat(p[0]);
+      const lng = parseFloat(p[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return {lat, lng};
+    }
+
+    function goToCoords() {
+      const c = parseCoords();
+      if (!c) return alert("Invalid coordinates");
+      const pos = {lat:c.lat, lng:c.lng};
+      map.setCenter(pos);
+      map.setZoom(20);
+      if (marker) marker.setMap(null);
+      marker = new google.maps.Marker({ position: pos, map });
+      document.getElementById("hint").innerText = "Location pinned.";
+    }
+
+    async function autoDetect() {
+      const c = parseCoords();
+      if (!c) return alert("Enter coordinates first");
+      document.getElementById("hint").innerText = "Detecting roof orientation…";
+      const r = await fetch(`/api/solar?lat=${c.lat}&lng=${c.lng}`);
+      const d = await r.json();
+      if (!r.ok) {
+        console.error(d);
+        document.getElementById("hint").innerText = "Solar API failed (see console).";
+        return;
+      }
+      document.getElementById("hint").innerText =
+        `Azimuth: ${d.recommended.azimuthDegFromNorth ?? "N/A"}°, Tilt: ${d.recommended.tiltDeg ?? "N/A"}°`;
+    }
+
+    window.initMap = function () {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: -1.286389, lng: 36.817223 },
+        zoom: 18,
+        mapTypeId: "satellite"
+      });
+
+      document.getElementById("go").onclick = goToCoords;
+      document.getElementById("auto").onclick = autoDetect;
+    };
+  </script>
+
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjYkseGZMK9Ej_NiWsMZwsL72MPtIur3g&callback=initMap">
+  </script>
+</body>
+</html>
