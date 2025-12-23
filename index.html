@@ -2,9 +2,8 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>PV Layout Tool (Multi Areas + Walkways + Auto-Fill)</title>
+  <title>PV Layout PRO (Multi Areas + Walkways + Meter-based Auto-Fill)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-
   <style>
     html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
     #map { height: 100%; width: 100%; }
@@ -14,7 +13,7 @@
       background:rgba(255,255,255,0.94);
       padding:10px 12px; border-radius:12px;
       box-shadow:0 8px 22px rgba(0,0,0,0.18);
-      z-index:5; width:420px;
+      z-index:5; width:410px;
       max-height:calc(100% - 24px);
       overflow:auto;
     }
@@ -24,11 +23,10 @@
     input,select{
       width:100%; padding:8px; box-sizing:border-box;
       border-radius:10px; border:1px solid #ccc;
-      font-size:14px;
     }
     button{
       width:100%; padding:10px; cursor:pointer; margin-top:8px;
-      border-radius:12px; border:1px solid #bbb; background:#f5f5f5;
+      border-radius:10px; border:1px solid #bbb; background:#f5f5f5;
       font-weight:600;
     }
     button:hover{ background:#eee; }
@@ -44,15 +42,19 @@
       margin-right:6px; margin-top:6px;
     }
     .stats{ margin-top:10px; font-weight:bold; }
-    .hint{ font-weight:normal; margin-top:6px; color:#333; }
+    .hint{ font-weight:normal; margin-top:6px; }
     .sectionTitle{
       font-weight:bold; margin-top:10px;
       padding-top:8px; border-top:1px solid #e5e5e5;
     }
-    .selectedBadge{
-      display:inline-block; margin-left:8px;
-      padding:3px 8px; border-radius:999px;
-      border:1px solid #ddd; background:#fafafa; font-size:12px;
+    .badge{
+      display:inline-block;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid #ddd;
+      background:#fafafa;
+      font-size:12px;
+      margin-left:8px;
     }
   </style>
 </head>
@@ -62,7 +64,6 @@
     <div class="sectionTitle" style="border-top:none; padding-top:0; margin-top:0;">
       Find location
     </div>
-
     <div class="row">
       <div style="flex:1.6;">
         <label>Coordinates (lat, lng)</label>
@@ -76,10 +77,10 @@
     <small>Paste as <b>lat, lng</b> then click Go.</small>
 
     <div class="sectionTitle">
-      Panel / Layout
-      <span class="selectedBadge" id="selInfo">Selected area: none</span>
+      Active Selection <span class="badge" id="selBadge">none</span>
     </div>
 
+    <div class="sectionTitle">Panel / Layout</div>
     <div class="row">
       <div>
         <label>Panel Length (m)</label>
@@ -104,45 +105,82 @@
 
     <div class="row">
       <div>
+        <label>Panel Orientation</label>
+        <select id="orient">
+          <option value="auto" selected>Auto (best)</option>
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </div>
+      <div>
         <label>Rotation Mode</label>
         <select id="rotMode">
-          <option value="auto" selected>Auto (longest edge)</option>
+          <option value="auto" selected>Auto (best)</option>
           <option value="manual">Manual angle</option>
           <option value="none">No rotation (0°)</option>
         </select>
       </div>
+    </div>
+
+    <div class="row">
       <div>
-        <label>Manual angle (deg, from East/X)</label>
+        <label>Manual angle (deg, from X/East)</label>
         <input id="manualAngle" type="number" step="0.1" value="0">
+      </div>
+      <div>
+        <label>Angle step (deg) (Auto)</label>
+        <input id="angleStep" type="number" step="1" value="5">
+      </div>
+    </div>
+
+    <div class="sectionTitle">Flat roof rack spacing (optional)</div>
+    <div class="row">
+      <div>
+        <label>Mount Type</label>
+        <select id="mountType">
+          <option value="flush" selected>Flush</option>
+          <option value="tilted">Tilted racks</option>
+        </select>
+      </div>
+      <div>
+        <label>Roof/Array Tilt (deg)</label>
+        <input id="roofTilt" type="number" step="0.1" value="10">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Min sun elevation (deg)</label>
+        <input id="minSunEl" type="number" step="0.1" value="20">
+      </div>
+      <div>
+        <label>Extra row gap (m)</label>
+        <input id="rowGap" type="number" step="0.01" value="0.20">
       </div>
     </div>
 
     <div class="sectionTitle">Draw / Actions</div>
 
     <div class="row">
-      <div><button id="btnDrawArea">Draw Roof / Ground Area</button></div>
-      <div><button id="btnDrawWalk">Draw Walkway / No-Go</button></div>
+      <div><button id="btnDrawArea">Draw NEW Roof / Ground AREA</button></div>
+      <div><button id="btnDrawWalk">Draw WALKWAY / NO-GO</button></div>
     </div>
 
     <div class="row">
-      <div><button id="btnStopDraw">Stop Drawing</button></div>
-      <div><button id="btnDeleteSelected">Delete Selected</button></div>
+      <div><button class="primary" id="btnFill">Auto-fill (Selected AREA)</button></div>
+      <div><button id="btnClearPanels">Clear Panels (Selected AREA)</button></div>
     </div>
 
-    <button class="primary" id="btnFill">Auto-fill Panels (Selected Area)</button>
-
     <div class="row">
-      <div><button id="btnClearAreaPanels">Clear Panels (Selected)</button></div>
+      <div><button id="btnDeleteSelected">Delete Selected Shape</button></div>
       <div><button id="btnExport">Export JSON</button></div>
     </div>
 
-    <button class="danger" id="btnReset">Reset Everything</button>
+    <button class="danger" id="btnReset">RESET (Clear Everything)</button>
 
     <small>
-      <span class="pill">1</span> Click <b>Draw Roof / Ground Area</b> and draw polygon (click first point to close).<br/>
-      <span class="pill">2</span> Click the polygon to <b>select</b> it (thicker outline).<br/>
-      <span class="pill">3</span> Click <b>Auto-fill</b>. Then draw the next side and repeat (nothing disappears).<br/>
-      <span class="pill">4</span> Use <b>Walkway / No-Go</b> polygons for access paths, tanks, skylights; panels avoid them.
+      <span class="pill">1</span> Draw an AREA polygon → click it to select.<br/>
+      <span class="pill">2</span> Draw WALKWAY/NO-GO polygons (panels avoid them).<br/>
+      <span class="pill">3</span> Auto-fill selected area. Draw another area: previous stays.
     </small>
 
     <div id="stats" class="stats"></div>
@@ -152,6 +190,9 @@
   <div id="map"></div>
 
   <script>
+    // =========================
+    // GLOBALS
+    // =========================
     let map, drawingManager;
     let pinMarker = null;
 
@@ -160,51 +201,54 @@
     const DRAW_WALK = "walk";
     let drawMode = DRAW_NONE;
 
-    // Areas: { id, poly, panels[] }
+    // Areas: { id, polygon, panels[] }
     const areas = [];
-    // Walkways / No-Go polygons
+    // Walkways/no-go polygons (global, apply to all areas)
     const walkways = [];
 
-    // Selected: { type: 'area', ref: areaObj } OR { type: 'walk', ref: polygon }
+    // Selected: { type: 'area', obj } OR { type:'walk', poly }
     let selected = null;
 
     function setHint(t){ document.getElementById("hint").innerText = t || ""; }
     function setStats(t){ document.getElementById("stats").innerText = t || ""; }
 
-    function updateSelectedInfo(){
-      const el = document.getElementById("selInfo");
-      if(!selected) el.innerText = "Selected area: none";
-      else if(selected.type === "area") el.innerText = `Selected area: ${selected.ref.id}`;
-      else el.innerText = "Selected: walkway/no-go";
+    function updateSelBadge(){
+      const el = document.getElementById("selBadge");
+      if(!selected) el.innerText = "none";
+      else if(selected.type === "area") el.innerText = selected.obj.id;
+      else el.innerText = "walkway/no-go";
     }
 
     function clearSelectionStyles(){
-      for(const a of areas){ a.poly.setOptions({ strokeWeight: 2 }); }
-      for(const w of walkways){ w.setOptions({ strokeWeight: 2 }); }
+      for(const a of areas) a.polygon.setOptions({ strokeWeight: 2 });
+      for(const w of walkways) w.setOptions({ strokeWeight: 2 });
     }
 
     function selectArea(areaObj){
-      selected = { type:"area", ref: areaObj };
+      selected = { type:"area", obj: areaObj };
       clearSelectionStyles();
-      areaObj.poly.setOptions({ strokeWeight: 4 });
-      updateSelectedInfo();
-      setHint("Area selected. Click Auto-fill Panels.");
+      areaObj.polygon.setOptions({ strokeWeight: 4 });
+      updateSelBadge();
+      setHint("AREA selected. Click Auto-fill.");
     }
 
-    function selectWalkway(poly){
-      selected = { type:"walk", ref: poly };
+    function selectWalk(poly){
+      selected = { type:"walk", poly };
       clearSelectionStyles();
       poly.setOptions({ strokeWeight: 4 });
-      updateSelectedInfo();
-      setHint("Walkway/no-go selected. You can delete it if needed.");
+      updateSelBadge();
+      setHint("Walkway/no-go selected.");
     }
 
     function unselectAll(){
       selected = null;
       clearSelectionStyles();
-      updateSelectedInfo();
+      updateSelBadge();
     }
 
+    // =========================
+    // COORDS JUMP
+    // =========================
     function goToCoords() {
       const raw = (document.getElementById("coords").value || "").trim();
       const parts = raw.split(/[\s,]+/).filter(Boolean);
@@ -226,251 +270,382 @@
       setHint(`Pinned: ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
     }
 
-    function metersToDegreesLat(m){ return m / 111320.0; }
-    function metersToDegreesLng(m, atLatDeg){
-      const c = Math.cos(atLatDeg * Math.PI/180);
-      return m / (111320.0 * Math.max(0.00001, c));
+    // =========================
+    // GEO UTILS (local meters)
+    // =========================
+    function latLngToMeters(lat, lng, refLat, refLng) {
+      const R = 6378137;
+      const dLat = (lat - refLat) * Math.PI / 180;
+      const dLng = (lng - refLng) * Math.PI / 180;
+      const x = dLng * R * Math.cos(refLat * Math.PI / 180);
+      const y = dLat * R;
+      return {x, y};
     }
 
-    function polygonToPath(poly){
-      return poly.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
+    function metersToLatLng(x, y, refLat, refLng) {
+      const R = 6378137;
+      const dLat = y / R;
+      const dLng = x / (R * Math.cos(refLat * Math.PI / 180));
+      const lat = refLat + (dLat * 180 / Math.PI);
+      const lng = refLng + (dLng * 180 / Math.PI);
+      return {lat, lng};
     }
 
-    function polygonBounds(path){
-      let minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
-      for(const p of path){
-        minLat=Math.min(minLat,p.lat); maxLat=Math.max(maxLat,p.lat);
-        minLng=Math.min(minLng,p.lng); maxLng=Math.max(maxLng,p.lng);
+    function centroid(poly) {
+      let a = 0, cx = 0, cy = 0;
+      for (let i=0, j=poly.length-1; i<poly.length; j=i++) {
+        const p1 = poly[j], p2 = poly[i];
+        const f = (p1.x * p2.y - p2.x * p1.y);
+        a += f;
+        cx += (p1.x + p2.x) * f;
+        cy += (p1.y + p2.y) * f;
       }
-      return {minLat,maxLat,minLng,maxLng};
+      a *= 0.5;
+      if (Math.abs(a) < 1e-9) {
+        const n = poly.length;
+        return {
+          x: poly.reduce((s,p)=>s+p.x,0)/n,
+          y: poly.reduce((s,p)=>s+p.y,0)/n
+        };
+      }
+      cx /= (6*a); cy /= (6*a);
+      return {x: cx, y: cy};
     }
 
-    function pointInPoly(pt, polyPath){
-      let x = pt.lng, y = pt.lat;
+    function rotatePoint(p, c, angRad) {
+      const dx = p.x - c.x, dy = p.y - c.y;
+      const ca = Math.cos(angRad), sa = Math.sin(angRad);
+      return { x: c.x + dx*ca - dy*sa, y: c.y + dx*sa + dy*ca };
+    }
+
+    function rotatePoly(poly, c, angRad) { return poly.map(p => rotatePoint(p, c, angRad)); }
+
+    function pointInPoly(pt, poly) {
       let inside = false;
-      for(let i=0, j=polyPath.length-1; i<polyPath.length; j=i++){
-        const xi=polyPath[i].lng, yi=polyPath[i].lat;
-        const xj=polyPath[j].lng, yj=polyPath[j].lat;
-        const intersect = ((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-12) + xi);
-        if(intersect) inside = !inside;
+      for (let i=0, j=poly.length-1; i<poly.length; j=i++) {
+        const xi = poly[i].x, yi = poly[i].y;
+        const xj = poly[j].x, yj = poly[j].y;
+        const intersect = ((yi > pt.y) !== (yj > pt.y)) &&
+          (pt.x < (xj - xi) * (pt.y - yi) / ((yj - yi) + 1e-12) + xi);
+        if (intersect) inside = !inside;
       }
       return inside;
     }
 
-    function longestEdgeAngleRad(path){
-      let bestLen=-1, bestAng=0;
-      for(let i=0; i<path.length; i++){
-        const a=path[i], b=path[(i+1)%path.length];
-        const dx=b.lng-a.lng, dy=b.lat-a.lat;
-        const len=Math.hypot(dx,dy);
-        if(len>bestLen){ bestLen=len; bestAng=Math.atan2(dy,dx); }
+    function distPointToSeg(pt, a, b) {
+      const vx = b.x - a.x, vy = b.y - a.y;
+      const wx = pt.x - a.x, wy = pt.y - a.y;
+      const c1 = vx*wx + vy*wy;
+      if (c1 <= 0) return Math.hypot(pt.x - a.x, pt.y - a.y);
+      const c2 = vx*vx + vy*vy;
+      if (c2 <= c1) return Math.hypot(pt.x - b.x, pt.y - b.y);
+      const t = c1 / c2;
+      const px = a.x + t*vx, py = a.y + t*vy;
+      return Math.hypot(pt.x - px, pt.y - py);
+    }
+
+    function minDistToPolyEdges(pt, poly) {
+      let minD = Infinity;
+      for (let i=0; i<poly.length; i++) {
+        const a = poly[i];
+        const b = poly[(i+1) % poly.length];
+        minD = Math.min(minD, distPointToSeg(pt, a, b));
       }
-      return bestAng;
+      return minD;
     }
 
-    function rectCorners(center, wDegLng, hDegLat, angRad){
-      const cx=center.lng, cy=center.lat;
-      const hw=wDegLng/2, hh=hDegLat/2;
-
-      return [{x:-hw,y:-hh},{x:hw,y:-hh},{x:hw,y:hh},{x:-hw,y:hh}].map(p=>{
-        const xr=p.x*Math.cos(angRad)-p.y*Math.sin(angRad);
-        const yr=p.x*Math.sin(angRad)+p.y*Math.cos(angRad);
-        return {lat:cy+yr, lng:cx+xr};
-      });
+    function rectCorners(x, y, w, h) {
+      return [{x:x,y:y},{x:x+w,y:y},{x:x+w,y:y+h},{x:x,y:y+h}];
     }
 
-    function rectFits(areaPath, corners){
-      for(const c of corners){
-        if(!pointInPoly(c, areaPath)) return false;
+    function rectValid(corners, roofPoly, noGoList, setback) {
+      for (const c of corners) {
+        if (!pointInPoly(c, roofPoly)) return false;
+        if (setback > 0) {
+          const d = minDistToPolyEdges(c, roofPoly);
+          if (d < setback) return false;
+        }
+      }
+      for (const ng of noGoList) {
+        for (const c of corners) {
+          if (pointInPoly(c, ng)) return false;
+        }
       }
       return true;
     }
 
-    function overlapsWalkways(corners){
-      for(const w of walkways){
-        const wp = polygonToPath(w);
-        for(const c of corners){
-          if(pointInPoly(c, wp)) return true;
+    function bbox(poly) {
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      for (const p of poly) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      return {minX, minY, maxX, maxY};
+    }
+
+    // Find longest edge direction of a polygon in meters -> angle from East/X (deg)
+    function longestEdgeAngleDegFromX(mPoly){
+      let bestLen=-1, bestAng=0;
+      for(let i=0; i<mPoly.length; i++){
+        const a=mPoly[i], b=mPoly[(i+1)%mPoly.length];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const len=Math.hypot(dx,dy);
+        if(len>bestLen){
+          bestLen=len;
+          bestAng = Math.atan2(dy,dx) * 180/Math.PI; // from +X
         }
       }
-      return false;
+      // normalize 0..180
+      bestAng = ((bestAng % 180) + 180) % 180;
+      return bestAng;
     }
 
-    function overlapsExistingPanels(areaObj, corners){
-      const bb = polygonBounds(corners);
-      for(const p of areaObj.panels){
-        const rbb = polygonBounds(p.__corners);
-        const overlap = !(bb.maxLat<rbb.minLat || bb.minLat>rbb.maxLat || bb.maxLng<rbb.minLng || bb.minLng>rbb.maxLng);
-        if(overlap) return true;
+    // =========================
+    // RACK ROW SPACING MODEL
+    // =========================
+    function computeRowPitch(pLen, tiltDeg, minSunElDeg, extraRowGap) {
+      const toRad = (d)=>d*Math.PI/180;
+      const tilt = toRad(Math.max(0, tiltDeg));
+      const minEl = toRad(Math.max(1, minSunElDeg));
+      const panelHeight = pLen * Math.sin(tilt);
+      const planDepth = pLen * Math.cos(tilt);
+      const shadow = panelHeight / Math.tan(minEl);
+      return planDepth + shadow + Math.max(0, extraRowGap);
+    }
+
+    // =========================
+    // SOLVER (same idea as your working code)
+    // =========================
+    function solveFor(pLen, pWid, anglesDeg, roofM, noGoM, gap, setback, mountType, roofTilt, minSunEl, rowGap) {
+      const c = centroid(roofM);
+      let best = null;
+
+      for (const angDeg0 of anglesDeg) {
+        const angDeg = ((angDeg0 % 180) + 180) % 180;
+        const ang = angDeg * Math.PI / 180;
+
+        const roofR = rotatePoly(roofM, c, -ang);
+        const noGoR = noGoM.map(poly => rotatePoly(poly, c, -ang));
+        const bb = bbox(roofR);
+
+        const stepX = pWid + gap;
+        let stepY = pLen + gap;
+        if (mountType === "tilted") stepY = computeRowPitch(pLen, roofTilt, minSunEl, rowGap);
+
+        const panels = [];
+        for (let y = bb.minY; y + pLen <= bb.maxY; y += stepY) {
+          for (let x = bb.minX; x + pWid <= bb.maxX; x += stepX) {
+            const cornersR = rectCorners(x, y, pWid, pLen);
+            if (!rectValid(cornersR, roofR, noGoR, setback)) continue;
+            const cornersM = cornersR.map(pt => rotatePoint(pt, c, +ang));
+            panels.push({ angDeg, cornersM });
+          }
+        }
+        if (!best || panels.length > best.count) best = { angDeg, count: panels.length, panels, stepY };
       }
-      return false;
+      return best;
     }
 
-    function updateTotalPanels(){
-      let total=0;
-      for(const a of areas) total += a.panels.length;
-      setStats(`Total panels placed: ${total}`);
+    function drawPanels(panelsM, refLat, refLng, targetAreaObj){
+      for (const p of panelsM) {
+        const llCorners = p.cornersM.map(m => {
+          const ll = metersToLatLng(m.x, m.y, refLat, refLng);
+          return new google.maps.LatLng(ll.lat, ll.lng);
+        });
+        const poly = new google.maps.Polygon({
+          paths: llCorners,
+          map,
+          strokeColor: "#00bfff",
+          strokeOpacity: 0.9,
+          strokeWeight: 1,
+          fillColor: "#00bfff",
+          fillOpacity: 0.25,
+          clickable: false
+        });
+        targetAreaObj.panels.push(poly);
+      }
     }
 
-    function autoFillSelected(){
+    function clearPanels(areaObj){
+      areaObj.panels.forEach(o => o.setMap(null));
+      areaObj.panels = [];
+    }
+
+    function totalPanelCount(){
+      return areas.reduce((s,a)=>s+a.panels.length,0);
+    }
+
+    // =========================
+    // AUTO-FILL (Selected area)
+    // =========================
+    function autoFillSelectedArea(){
       if(!selected || selected.type !== "area"){
         alert("Click an AREA polygon to select it first.");
         return;
       }
 
-      const areaObj = selected.ref;
-      const areaPath = polygonToPath(areaObj.poly);
+      const areaObj = selected.obj;
+      clearPanels(areaObj);
 
-      const pLen = parseFloat(document.getElementById("pLen").value);
-      const pWid = parseFloat(document.getElementById("pWid").value);
-      const gap = parseFloat(document.getElementById("gap").value);
-      const setback = parseFloat(document.getElementById("setback").value);
+      const inp = {
+        pLen0: parseFloat(document.getElementById("pLen").value),
+        pWid0: parseFloat(document.getElementById("pWid").value),
+        gap: parseFloat(document.getElementById("gap").value),
+        setback: parseFloat(document.getElementById("setback").value),
+        orient: document.getElementById("orient").value,
+        rotMode: document.getElementById("rotMode").value,
+        manualAngle: parseFloat(document.getElementById("manualAngle").value),
+        angleStep: Math.max(1, parseFloat(document.getElementById("angleStep").value)),
+        mountType: document.getElementById("mountType").value,
+        roofTilt: parseFloat(document.getElementById("roofTilt").value),
+        minSunEl: parseFloat(document.getElementById("minSunEl").value),
+        rowGap: parseFloat(document.getElementById("rowGap").value)
+      };
 
-      if(![pLen,pWid,gap,setback].every(Number.isFinite)){
-        alert("Check panel inputs."); return;
+      if(![inp.pLen0, inp.pWid0, inp.gap, inp.setback].every(Number.isFinite)){
+        alert("Check your numeric inputs."); return;
       }
 
-      const bounds = polygonBounds(areaPath);
-      const centerLat = (bounds.minLat + bounds.maxLat)/2;
+      const roofPathLL = areaObj.polygon.getPath().getArray();
+      const refLat = roofPathLL[0].lat();
+      const refLng = roofPathLL[0].lng();
 
-      const cellWm = pWid + gap;
-      const cellHm = pLen + gap;
+      const roofM = roofPathLL.map(ll => latLngToMeters(ll.lat(), ll.lng(), refLat, refLng));
 
-      const cellW = metersToDegreesLng(cellWm, centerLat);
-      const cellH = metersToDegreesLat(cellHm);
+      // Global walkways/no-go apply to this area too
+      const noGoM = walkways.map(pg =>
+        pg.getPath().getArray().map(ll => latLngToMeters(ll.lat(), ll.lng(), refLat, refLng))
+      );
 
-      const sbLat = metersToDegreesLat(setback);
-      const sbLng = metersToDegreesLng(setback, centerLat);
-
-      const scanMinLat = bounds.minLat + sbLat;
-      const scanMaxLat = bounds.maxLat - sbLat;
-      const scanMinLng = bounds.minLng + sbLng;
-      const scanMaxLng = bounds.maxLng - sbLng;
-
-      if(scanMaxLat <= scanMinLat || scanMaxLng <= scanMinLng){
-        alert("Setback too large for this area."); return;
+      // orientations
+      const candidates = [];
+      if (inp.orient === "portrait") candidates.push({name:"portrait", pLen: inp.pLen0, pWid: inp.pWid0});
+      else if (inp.orient === "landscape") candidates.push({name:"landscape", pLen: inp.pWid0, pWid: inp.pLen0});
+      else {
+        candidates.push({name:"portrait", pLen: inp.pLen0, pWid: inp.pWid0});
+        candidates.push({name:"landscape", pLen: inp.pWid0, pWid: inp.pLen0});
       }
 
-      const rotMode = document.getElementById("rotMode").value;
-      let angRad = 0;
-      if(rotMode === "none") angRad = 0;
-      else if(rotMode === "manual"){
-        const deg = parseFloat(document.getElementById("manualAngle").value) || 0;
-        angRad = deg * Math.PI/180;
+      // angles
+      let anglesDeg = [0];
+      if (inp.rotMode === "none") {
+        anglesDeg = [0];
+      } else if (inp.rotMode === "manual") {
+        anglesDeg = [((inp.manualAngle % 180) + 180) % 180];
       } else {
-        angRad = longestEdgeAngleRad(areaPath);
+        // Auto: bias around longest edge direction of THIS area, then scan
+        const preferred = longestEdgeAngleDegFromX(roofM);
+        const step = inp.angleStep;
+        anglesDeg = [];
+        for (let d=-30; d<=30; d+=step) anglesDeg.push((((preferred + d) % 180) + 180) % 180);
+        for (let a=0; a<180; a+=step) anglesDeg.push(a);
+        anglesDeg = Array.from(new Set(anglesDeg.map(v => +v.toFixed(4))));
       }
 
-      const rectW = metersToDegreesLng(pWid, centerLat);
-      const rectH = metersToDegreesLat(pLen);
-
-      let placed = 0;
-      const maxTries = 90000;
-      let tries = 0;
-
-      for(let lat = scanMinLat; lat <= scanMaxLat; lat += cellH){
-        for(let lng = scanMinLng; lng <= scanMaxLng; lng += cellW){
-          if(tries++ > maxTries) break;
-
-          const center = {lat, lng};
-          const corners = rectCorners(center, rectW, rectH, angRad);
-
-          if(!rectFits(areaPath, corners)) continue;
-          if(overlapsWalkways(corners)) continue;
-          if(overlapsExistingPanels(areaObj, corners)) continue;
-
-          const poly = new google.maps.Polygon({
-            paths: corners,
-            map,
-            strokeColor: "#00bfff",
-            strokeOpacity: 0.9,
-            strokeWeight: 1,
-            fillColor: "#00bfff",
-            fillOpacity: 0.25,
-            clickable: false
-          });
-          poly.__corners = corners;
-          areaObj.panels.push(poly);
-          placed++;
+      // solve best
+      let bestOverall = null;
+      for (const cand of candidates) {
+        const best = solveFor(
+          cand.pLen, cand.pWid, anglesDeg,
+          roofM, noGoM,
+          inp.gap, inp.setback,
+          inp.mountType, inp.roofTilt, inp.minSunEl, inp.rowGap
+        );
+        if (!bestOverall || best.count > bestOverall.count) {
+          bestOverall = {
+            orientation: cand.name,
+            pLen: cand.pLen,
+            pWid: cand.pWid,
+            angDeg: best.angDeg,
+            panels: best.panels,
+            count: best.count,
+            rowPitchY: best.stepY
+          };
         }
-        if(tries > maxTries) break;
       }
 
-      updateTotalPanels();
-      setHint(`Auto-fill complete for ${areaObj.id}. Added ${placed} panels.`);
+      if (!bestOverall || bestOverall.count === 0) {
+        setStats(`No panels could be placed for ${areaObj.id}. Reduce setback/gap, or redraw polygon.`);
+        setHint("");
+        return;
+      }
+
+      drawPanels(bestOverall.panels, refLat, refLng, areaObj);
+
+      const rowPitchTxt = (inp.mountType === "tilted") ? ` | Row pitch: ${bestOverall.rowPitchY.toFixed(2)} m` : "";
+      setStats(`Selected ${areaObj.id} → Panels: ${bestOverall.count} | ${bestOverall.orientation} | Rotation: ${bestOverall.angDeg.toFixed(1)}°` + rowPitchTxt
+        + ` | TOTAL: ${totalPanelCount()}`);
+      setHint("Tip: Draw another area (next roof side) — previous areas will remain.");
     }
 
-    function clearPanelsSelected(){
-      if(!selected || selected.type !== "area"){
-        alert("Select an AREA first."); return;
-      }
-      const areaObj = selected.ref;
-      for(const p of areaObj.panels) p.setMap(null);
-      areaObj.panels = [];
-      updateTotalPanels();
-      setHint(`Cleared panels for ${areaObj.id}.`);
+    function clearSelectedPanels(){
+      if(!selected || selected.type !== "area"){ alert("Select an AREA first."); return; }
+      clearPanels(selected.obj);
+      setStats(`Cleared panels for ${selected.obj.id}. TOTAL: ${totalPanelCount()}`);
+      setHint("");
     }
 
     function deleteSelected(){
       if(!selected){ alert("Nothing selected."); return; }
 
       if(selected.type === "area"){
-        const a = selected.ref;
-        for(const p of a.panels) p.setMap(null);
-        a.poly.setMap(null);
+        const a = selected.obj;
+        clearPanels(a);
+        a.polygon.setMap(null);
         const idx = areas.indexOf(a);
         if(idx >= 0) areas.splice(idx,1);
         unselectAll();
-        updateTotalPanels();
-        setHint("Deleted selected area.");
+        setStats(`Deleted area. TOTAL panels: ${totalPanelCount()}`);
       } else {
-        const w = selected.ref;
+        const w = selected.poly;
         w.setMap(null);
         const idx = walkways.indexOf(w);
         if(idx >= 0) walkways.splice(idx,1);
         unselectAll();
-        setHint("Deleted selected walkway/no-go.");
+        setStats(`Deleted walkway/no-go. TOTAL panels: ${totalPanelCount()}`);
       }
+      setHint("");
     }
 
-    function resetEverything(){
+    function resetAll(){
       for(const a of areas){
-        for(const p of a.panels) p.setMap(null);
-        a.poly.setMap(null);
+        clearPanels(a);
+        a.polygon.setMap(null);
       }
       areas.length = 0;
 
       for(const w of walkways) w.setMap(null);
       walkways.length = 0;
 
-      if(pinMarker){ pinMarker.setMap(null); pinMarker = null; }
-
-      drawMode = DRAW_NONE;
-      drawingManager.setDrawingMode(null);
+      if(pinMarker){ pinMarker.setMap(null); pinMarker=null; }
 
       unselectAll();
-      updateTotalPanels();
-      setHint("Reset complete. Everything cleared.");
+      drawingManager.setDrawingMode(null);
+      drawMode = DRAW_NONE;
+
+      setStats("");
+      setHint("Reset complete.");
     }
 
     function exportJSON(){
-      const out = { timestamp: new Date().toISOString(), areas: [], walkways: [], panels: [] };
-
-      for(const a of areas){
-        out.areas.push({ id: a.id, path: polygonToPath(a.poly) });
-        for(const p of a.panels){
-          out.panels.push({ areaId: a.id, corners: p.__corners });
-        }
-      }
-      for(const w of walkways){
-        out.walkways.push({ path: polygonToPath(w) });
-      }
+      const out = {
+        timestamp: new Date().toISOString(),
+        areas: areas.map(a => ({
+          id: a.id,
+          polygon: a.polygon.getPath().getArray().map(ll => ({lat: ll.lat(), lng: ll.lng()})),
+          panels: a.panels.map(p => p.getPath().getArray().map(ll => ({lat: ll.lat(), lng: ll.lng()})))
+        })),
+        walkways: walkways.map(w => w.getPath().getArray().map(ll => ({lat: ll.lat(), lng: ll.lng()}))),
+        total_panels: totalPanelCount()
+      };
 
       const blob = new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "pv_layout.json";
+      a.download = "pv_layout_multi.json";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -479,20 +654,9 @@
       setHint("Exported JSON.");
     }
 
-    function startDraw(mode){
-      drawMode = mode;
-      drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-
-      if(mode === DRAW_AREA) setHint("Drawing AREA: click corners, then click first point to close (or double-click).");
-      if(mode === DRAW_WALK) setHint("Drawing WALKWAY/NO-GO: draw polygon and close it.");
-    }
-
-    function stopDraw(){
-      drawMode = DRAW_NONE;
-      drawingManager.setDrawingMode(null);
-      setHint("Drawing stopped.");
-    }
-
+    // =========================
+    // INIT MAP + DRAWING
+    // =========================
     function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: -1.286389, lng: 36.817223 },
@@ -513,7 +677,7 @@
 
         const poly = e.overlay;
 
-        if(drawMode === DRAW_AREA){
+        if (drawMode === DRAW_AREA) {
           poly.setOptions({
             fillColor: "#00ff88",
             fillOpacity: 0.15,
@@ -522,18 +686,21 @@
             editable: true
           });
 
-          const areaObj = { id: `area_${Date.now()}`, poly, panels: [] };
+          const areaObj = { id: `area_${Date.now()}`, polygon: poly, panels: [] };
           areas.push(areaObj);
 
           poly.addListener("click", () => selectArea(areaObj));
           selectArea(areaObj);
 
-          // keep drawing on so you can draw the next side immediately
-          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-          setHint("Area saved. Click Auto-fill, or draw the next side (previous stays).");
+          // stop drawing mode (less accidental polygons)
+          drawingManager.setDrawingMode(null);
+          drawMode = DRAW_NONE;
+
+          setHint("Area saved. Click Auto-fill. Then draw the next roof side: previous stays.");
+          setStats(`Areas: ${areas.length} | TOTAL panels: ${totalPanelCount()}`);
         }
 
-        if(drawMode === DRAW_WALK){
+        if (drawMode === DRAW_WALK) {
           poly.setOptions({
             fillColor: "#ff3355",
             fillOpacity: 0.22,
@@ -543,35 +710,45 @@
           });
 
           walkways.push(poly);
-          poly.addListener("click", () => selectWalkway(poly));
-          selectWalkway(poly);
+          poly.addListener("click", () => selectWalk(poly));
+          selectWalk(poly);
 
-          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-          setHint("Walkway/no-go saved. Panels will avoid it. Draw another or Auto-fill.");
+          drawingManager.setDrawingMode(null);
+          drawMode = DRAW_NONE;
+
+          setHint("Walkway/no-go saved. Panels will avoid it. Re-run Auto-fill for any area.");
+          setStats(`Walkways: ${walkways.length} | TOTAL panels: ${totalPanelCount()}`);
         }
       });
 
       map.addListener("click", () => unselectAll());
 
+      // UI hooks
       document.getElementById("btnGoCoords").addEventListener("click", goToCoords);
       document.getElementById("coords").addEventListener("keydown", (e) => { if (e.key === "Enter") goToCoords(); });
 
-      document.getElementById("btnDrawArea").addEventListener("click", () => startDraw(DRAW_AREA));
-      document.getElementById("btnDrawWalk").addEventListener("click", () => startDraw(DRAW_WALK));
-      document.getElementById("btnStopDraw").addEventListener("click", stopDraw);
+      document.getElementById("btnDrawArea").addEventListener("click", () => {
+        drawMode = DRAW_AREA;
+        drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+        setHint("Draw AREA polygon: click corners, then click first point to close.");
+      });
 
-      document.getElementById("btnFill").addEventListener("click", autoFillSelected);
-      document.getElementById("btnClearAreaPanels").addEventListener("click", clearPanelsSelected);
+      document.getElementById("btnDrawWalk").addEventListener("click", () => {
+        drawMode = DRAW_WALK;
+        drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+        setHint("Draw WALKWAY/NO-GO polygon and close it.");
+      });
+
+      document.getElementById("btnFill").addEventListener("click", autoFillSelectedArea);
+      document.getElementById("btnClearPanels").addEventListener("click", clearSelectedPanels);
       document.getElementById("btnDeleteSelected").addEventListener("click", deleteSelected);
-      document.getElementById("btnReset").addEventListener("click", resetEverything);
+      document.getElementById("btnReset").addEventListener("click", resetAll);
       document.getElementById("btnExport").addEventListener("click", exportJSON);
 
-      updateTotalPanels();
-      updateSelectedInfo();
-      setHint("Ready. Click 'Draw Roof / Ground Area' to start.");
+      updateSelBadge();
+      setHint("Ready. Draw an AREA, click it to select, then Auto-fill.");
     }
   </script>
-
   <!-- Replace YOUR_MAPS_JS_KEY_HERE with your temporary key -->
  <script async defer
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjYkseGZMK9Ej_NiWsMZwsL72MPtIur3g&libraries=drawing&callback=initMap">
