@@ -1,82 +1,630 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Solar Roof Layout Tool</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Roof / Ground PV Layout Tool</title>
+
   <style>
-    html, body { height:100%; margin:0; font-family: Arial, sans-serif; }
-    #map { height:100%; width:100%; }
-    .panel{
-      position:absolute; top:12px; left:12px; z-index:5;
-      width:360px; background:rgba(255,255,255,0.95);
-      padding:12px; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.2);
+    html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
+    #map { height: 100%; width: 100%; }
+
+    .ui {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      width: 420px; max-height: calc(100% - 24px);
+      overflow: auto;
+      background: rgba(255,255,255,0.95);
+      padding: 12px; border-radius: 14px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.25);
     }
-    input, button { width:100%; padding:10px; margin-top:8px; box-sizing:border-box; }
-    .hint { margin-top:8px; font-size:13px; }
+
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+
+    label { font-size: 12px; color: #222; display: block; margin-top: 10px; }
+    input, select, button {
+      width: 100%; box-sizing: border-box;
+      padding: 10px; border-radius: 10px;
+      border: 1px solid #cfcfcf;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    button { cursor: pointer; border: 0; background: #111; color: #fff; }
+    button.secondary { background: #eaeaea; color: #111; border: 1px solid #cfcfcf; }
+    button.danger { background: #c62828; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .hint {
+      font-size: 12px; color: #333;
+      margin-top: 8px; line-height: 1.35;
+    }
+
+    .badge {
+      display:inline-block; padding: 4px 8px;
+      background:#f2f2f2; border:1px solid #ddd;
+      border-radius: 999px; font-size: 12px; margin-right: 6px;
+    }
+
+    .divider { height: 1px; background: #e7e7e7; margin: 12px 0; }
+
+    .small { font-size: 12px; color:#444; }
+
+    .stat { margin-top: 8px; font-size: 13px; }
+    .stat b { font-size: 14px; }
+
+    .mode {
+      display:flex; gap: 8px; margin-top: 8px;
+    }
+    .mode button { flex:1; }
   </style>
 </head>
+
 <body>
-  <div class="panel">
-    <b>Coordinates (lat, lng)</b>
-    <input id="coords" value="-1.2981371, 36.8907759" />
-    <button id="go">Go to location</button>
-    <button id="auto">Auto-detect roof tilt & azimuth</button>
-    <div class="hint" id="hint"></div>
+  <div class="ui">
+    <div style="font-size:18px;font-weight:700;">PV Layout Tool</div>
+    <div class="small">Draw multiple roof sides / ground areas, add walkways, then auto-fill panels per area.</div>
+
+    <div class="divider"></div>
+
+    <label>Find location (lat, lng)</label>
+    <div class="row">
+      <div style="flex:2;">
+        <input id="coords" value="-1.2981371, 36.8907759" />
+      </div>
+      <div>
+        <button id="goBtn" class="secondary">Go</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="row">
+      <div>
+        <label>Panel Length (m)</label>
+        <input id="pLen" type="number" step="0.001" value="2.279" />
+      </div>
+      <div>
+        <label>Panel Width (m)</label>
+        <input id="pWid" type="number" step="0.001" value="1.134" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Gap between panels (m)</label>
+        <input id="gap" type="number" step="0.001" value="0.02" />
+      </div>
+      <div>
+        <label>Edge setback (m)</label>
+        <input id="setback" type="number" step="0.01" value="0.30" />
+      </div>
+    </div>
+
+    <label>Rotation Mode</label>
+    <div class="row">
+      <div>
+        <select id="rotMode">
+          <option value="auto">Auto-rotate (best fit)</option>
+          <option value="manual">Manual angle</option>
+        </select>
+      </div>
+      <div>
+        <label style="margin-top:0;">Manual angle (deg)</label>
+        <input id="manualAngle" type="number" step="1" value="0" />
+      </div>
+    </div>
+
+    <div class="hint">
+      <span class="badge">Tip</span>
+      Auto-rotate uses the roof polygon’s main direction. Manual angle is useful when satellite image is rotated or for special layouts.
+    </div>
+
+    <div class="divider"></div>
+
+    <div style="font-weight:700;">Draw / Actions</div>
+
+    <div class="mode">
+      <button id="drawAreaBtn" class="secondary">Draw Roof / Ground Area</button>
+      <button id="drawWalkBtn" class="secondary">Draw Walkway / No-Go</button>
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <div>
+        <button id="autoFillBtn">Auto-fill Panels (Selected Area)</button>
+      </div>
+      <div>
+        <button id="clearPanelsBtn" class="secondary">Clear Panels (Selected)</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <div>
+        <button id="exportBtn" class="secondary">Export JSON</button>
+      </div>
+      <div>
+        <button id="resetBtn" class="danger">Reset Everything</button>
+      </div>
+    </div>
+
+    <div class="hint">
+      <b>Workflow:</b><br>
+      1) Click <b>Draw Roof / Ground Area</b>, draw one side, double-click to finish.<br>
+      2) Click the polygon to <b>select it</b>, then click <b>Auto-fill Panels</b>.<br>
+      3) Draw the next side. It will stay. Repeat.<br>
+      4) Use <b>Draw Walkway / No-Go</b> to cut out paths, skylights, tanks, access lanes, etc.
+    </div>
+
+    <div class="stat" id="stats"><b>Panels placed:</b> 0</div>
+    <div class="hint" id="msg"></div>
   </div>
 
   <div id="map"></div>
 
   <script>
-    let map, marker;
+    // =========================
+    // Globals
+    // =========================
+    let map, marker = null;
+
+    // We store many independent "areas" (roof sides / ground blocks)
+    // Each area = { poly, panels: [rect...], id }
+    const areas = [];
+
+    // Walkways / no-go zones apply globally (they block panel placement)
+    // Each walkway = polygon
+    const walkways = [];
+
+    // Current selection
+    let selectedArea = null;
+
+    // Drawing state
+    let drawingMode = null; // 'area' | 'walkway' | null
+    let tempPath = [];
+    let tempPolyline = null;
+    let tempClicks = [];
+
+    // =========================
+    // Helpers
+    // =========================
+    const $ = (id) => document.getElementById(id);
+
+    function setMsg(t) { $("msg").innerText = t || ""; }
 
     function parseCoords() {
-      const raw = document.getElementById("coords").value.trim();
-      const p = raw.split(/[\s,]+/);
-      if (p.length < 2) return null;
-      const lat = parseFloat(p[0]);
-      const lng = parseFloat(p[1]);
+      const raw = ($("coords").value || "").trim();
+      const parts = raw.split(/[\s,]+/).filter(Boolean);
+      if (parts.length < 2) return null;
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-      return {lat, lng};
+      return { lat, lng };
     }
 
     function goToCoords() {
       const c = parseCoords();
-      if (!c) return alert("Invalid coordinates");
-      const pos = {lat:c.lat, lng:c.lng};
+      if (!c) return alert("Enter coordinates like: -1.2981371, 36.8907759");
+      const pos = { lat: c.lat, lng: c.lng };
       map.setCenter(pos);
       map.setZoom(20);
       if (marker) marker.setMap(null);
       marker = new google.maps.Marker({ position: pos, map });
-      document.getElementById("hint").innerText = "Location pinned.";
+      setMsg("Pinned location. Now draw roof/ground areas.");
     }
 
-    async function autoDetect() {
-      const c = parseCoords();
-      if (!c) return alert("Enter coordinates first");
-      document.getElementById("hint").innerText = "Detecting roof orientation…";
-      const r = await fetch(`/api/solar?lat=${c.lat}&lng=${c.lng}`);
-      const d = await r.json();
-      if (!r.ok) {
-        console.error(d);
-        document.getElementById("hint").innerText = "Solar API failed (see console).";
+    function metersToDegreesLat(m) {
+      // 1 deg lat ~ 111,320m
+      return m / 111320.0;
+    }
+
+    function metersToDegreesLng(m, atLatDeg) {
+      // 1 deg lng ~ 111,320m * cos(lat)
+      const c = Math.cos(atLatDeg * Math.PI / 180.0);
+      return m / (111320.0 * Math.max(0.00001, c));
+    }
+
+    function polygonBoundsLatLng(path) {
+      let minLat=Infinity, maxLat=-Infinity, minLng=Infinity, maxLng=-Infinity;
+      for (const p of path) {
+        minLat = Math.min(minLat, p.lat);
+        maxLat = Math.max(maxLat, p.lat);
+        minLng = Math.min(minLng, p.lng);
+        maxLng = Math.max(maxLng, p.lng);
+      }
+      return { minLat, maxLat, minLng, maxLng };
+    }
+
+    function pointInPoly(pt, polyPath) {
+      // Ray casting algorithm on lat/lng plane
+      let x = pt.lng, y = pt.lat;
+      let inside = false;
+      for (let i=0, j=polyPath.length-1; i<polyPath.length; j=i++) {
+        const xi = polyPath[i].lng, yi = polyPath[i].lat;
+        const xj = polyPath[j].lng, yj = polyPath[j].lat;
+        const intersect = ((yi > y) !== (yj > y)) &&
+          (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function rectCorners(center, wDegLng, hDegLat, angleRad) {
+      // rectangle centered at center (lat/lng), width along x (lng), height along y (lat), rotated angleRad
+      const cx = center.lng, cy = center.lat;
+      const hw = wDegLng / 2, hh = hDegLat / 2;
+
+      const pts = [
+        {x: -hw, y: -hh},
+        {x:  hw, y: -hh},
+        {x:  hw, y:  hh},
+        {x: -hw, y:  hh},
+      ].map(p => {
+        const xr = p.x * Math.cos(angleRad) - p.y * Math.sin(angleRad);
+        const yr = p.x * Math.sin(angleRad) + p.y * Math.cos(angleRad);
+        return { lat: cy + yr, lng: cx + xr };
+      });
+
+      return pts;
+    }
+
+    function rectFits(polyPath, corners) {
+      // All corners inside area polygon
+      for (const c of corners) {
+        if (!pointInPoly(c, polyPath)) return false;
+      }
+      return true;
+    }
+
+    function overlapsWalkway(corners) {
+      // simple test: if rectangle center or any corner is inside any walkway polygon
+      // (approx but works well for walkway exclusion)
+      for (const w of walkways) {
+        const wPath = w.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
+        for (const c of corners) {
+          if (pointInPoly(c, wPath)) return true;
+        }
+      }
+      return false;
+    }
+
+    function overlapsAnyPanel(area, corners) {
+      // Panel overlap check using bounding boxes of corners (approx)
+      const bb = polygonBoundsLatLng(corners);
+      for (const r of area.panels) {
+        const rp = r.__corners;
+        const rbb = polygonBoundsLatLng(rp);
+        const overlap = !(bb.maxLat < rbb.minLat || bb.minLat > rbb.maxLat || bb.maxLng < rbb.minLng || bb.minLng > rbb.maxLng);
+        if (overlap) return true;
+      }
+      return false;
+    }
+
+    function mainAxisAngle(polyPath) {
+      // PCA-like: use the longest edge direction as a robust main direction
+      let bestLen = -1, bestAng = 0;
+      for (let i=0; i<polyPath.length; i++) {
+        const a = polyPath[i];
+        const b = polyPath[(i+1) % polyPath.length];
+        const dx = (b.lng - a.lng);
+        const dy = (b.lat - a.lat);
+        const len = Math.hypot(dx, dy);
+        if (len > bestLen) {
+          bestLen = len;
+          bestAng = Math.atan2(dy, dx); // radians in lat/lng plane
+        }
+      }
+      return bestAng;
+    }
+
+    function setSelectedArea(areaObj) {
+      selectedArea = areaObj;
+      for (const a of areas) {
+        a.poly.setOptions({ strokeWeight: (a === selectedArea) ? 4 : 2 });
+      }
+      setMsg(selectedArea ? "Selected area. Now Auto-fill panels, or add walkways." : "");
+    }
+
+    function updateStats() {
+      let total = 0;
+      for (const a of areas) total += a.panels.length;
+      $("stats").innerHTML = `<b>Panels placed:</b> ${total}`;
+    }
+
+    // =========================
+    // Drawing (polygons)
+    // =========================
+    function startDrawing(mode) {
+      drawingMode = mode; // 'area' or 'walkway'
+      tempPath = [];
+      setSelectedArea(selectedArea); // keep selection visuals
+      setMsg(mode === 'area'
+        ? "Drawing area: click points, double-click to finish."
+        : "Drawing walkway/no-go: click points, double-click to finish."
+      );
+
+      if (tempPolyline) tempPolyline.setMap(null);
+      tempPolyline = new google.maps.Polyline({
+        map,
+        path: [],
+        strokeColor: mode === 'area' ? "#00b894" : "#d63031",
+        strokeOpacity: 1,
+        strokeWeight: 2
+      });
+
+      // map click listener
+      tempClicks.push(map.addListener("click", (e) => {
+        if (!drawingMode) return;
+        tempPath.push({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        tempPolyline.setPath(tempPath);
+      }));
+
+      // double-click ends polygon
+      tempClicks.push(map.addListener("dblclick", (e) => {
+        if (!drawingMode) return;
+        // Prevent default zoom
+        e.stop();
+        finishDrawing();
+      }));
+    }
+
+    function stopTempListeners() {
+      for (const l of tempClicks) google.maps.event.removeListener(l);
+      tempClicks = [];
+    }
+
+    function finishDrawing() {
+      if (!drawingMode) return;
+      stopTempListeners();
+
+      if (tempPolyline) tempPolyline.setMap(null);
+      tempPolyline = null;
+
+      if (tempPath.length < 3) {
+        drawingMode = null;
+        tempPath = [];
+        setMsg("Need at least 3 points.");
         return;
       }
-      document.getElementById("hint").innerText =
-        `Azimuth: ${d.recommended.azimuthDegFromNorth ?? "N/A"}°, Tilt: ${d.recommended.tiltDeg ?? "N/A"}°`;
+
+      const poly = new google.maps.Polygon({
+        map,
+        paths: tempPath,
+        strokeColor: drawingMode === 'area' ? "#00b894" : "#d63031",
+        strokeOpacity: 1,
+        strokeWeight: 2,
+        fillColor: drawingMode === 'area' ? "#00b894" : "#d63031",
+        fillOpacity: 0.20,
+        clickable: true,
+        editable: true
+      });
+
+      if (drawingMode === 'area') {
+        const areaObj = { id: `area_${Date.now()}`, poly, panels: [] };
+        areas.push(areaObj);
+
+        poly.addListener("click", () => setSelectedArea(areaObj));
+        poly.addListener("rightclick", () => setSelectedArea(areaObj));
+
+        setSelectedArea(areaObj);
+        setMsg("Area saved. You can draw another side, or Auto-fill this selected area.");
+      } else {
+        walkways.push(poly);
+        setMsg("Walkway/No-Go saved. Panels will avoid it.");
+      }
+
+      drawingMode = null;
+      tempPath = [];
+      updateStats();
     }
 
-    window.initMap = function () {
+    // =========================
+    // Panel filling
+    // =========================
+    function autoFillSelected() {
+      if (!selectedArea) return alert("Select an area polygon first (click it).");
+
+      const pLen = parseFloat($("pLen").value);
+      const pWid = parseFloat($("pWid").value);
+      const gap = parseFloat($("gap").value);
+      const setback = parseFloat($("setback").value);
+
+      if (![pLen, pWid, gap, setback].every(Number.isFinite)) {
+        return alert("Check panel size, gap and setback inputs.");
+      }
+
+      // Convert meters to degrees (approx using center latitude)
+      const path = selectedArea.poly.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
+      const bounds = polygonBoundsLatLng(path);
+      const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+
+      const cellWm = pWid + gap;
+      const cellHm = pLen + gap;
+
+      const cellW = metersToDegreesLng(cellWm, centerLat);
+      const cellH = metersToDegreesLat(cellHm);
+
+      // setback degrees (approx)
+      const sbLat = metersToDegreesLat(setback);
+      const sbLng = metersToDegreesLng(setback, centerLat);
+
+      // Shrink bounding scan area by setback
+      const scanMinLat = bounds.minLat + sbLat;
+      const scanMaxLat = bounds.maxLat - sbLat;
+      const scanMinLng = bounds.minLng + sbLng;
+      const scanMaxLng = bounds.maxLng - sbLng;
+
+      if (scanMaxLat <= scanMinLat || scanMaxLng <= scanMinLng) {
+        return alert("Setback too large for this area.");
+      }
+
+      // rotation angle
+      let angleRad = 0;
+      if ($("rotMode").value === "manual") {
+        angleRad = (parseFloat($("manualAngle").value) || 0) * Math.PI / 180.0;
+      } else {
+        // auto: follow longest edge direction
+        angleRad = mainAxisAngle(path);
+      }
+
+      // Panel rectangle size in degrees:
+      // width along "x (lng)" and height along "y (lat)" before rotation.
+      const rectW = metersToDegreesLng(pWid, centerLat);
+      const rectH = metersToDegreesLat(pLen);
+
+      let placed = 0;
+      const maxTries = 60000; // safety
+      let tries = 0;
+
+      // Scan centers in a grid
+      for (let lat = scanMinLat; lat <= scanMaxLat; lat += cellH) {
+        for (let lng = scanMinLng; lng <= scanMaxLng; lng += cellW) {
+          if (tries++ > maxTries) break;
+
+          const center = { lat, lng };
+          const corners = rectCorners(center, rectW, rectH, angleRad);
+
+          // inside selected area
+          if (!rectFits(path, corners)) continue;
+
+          // avoid walkways
+          if (overlapsWalkway(corners)) continue;
+
+          // avoid already placed panels in this area
+          if (overlapsAnyPanel(selectedArea, corners)) continue;
+
+          // draw panel as polygon
+          const panelPoly = new google.maps.Polygon({
+            map,
+            paths: corners,
+            strokeColor: "#0984e3",
+            strokeOpacity: 1,
+            strokeWeight: 1,
+            fillColor: "#0984e3",
+            fillOpacity: 0.35,
+            clickable: false
+          });
+
+          panelPoly.__corners = corners; // store for overlap tests
+          selectedArea.panels.push(panelPoly);
+          placed++;
+        }
+        if (tries > maxTries) break;
+      }
+
+      updateStats();
+      setMsg(`Auto-fill complete for selected area. Added ${placed} panels.`);
+    }
+
+    function clearPanelsSelected() {
+      if (!selectedArea) return alert("Select an area polygon first.");
+      for (const p of selectedArea.panels) p.setMap(null);
+      selectedArea.panels = [];
+      updateStats();
+      setMsg("Cleared panels for selected area.");
+    }
+
+    // =========================
+    // Reset + Export
+    // =========================
+    function resetEverything() {
+      // remove areas + panels
+      for (const a of areas) {
+        for (const p of a.panels) p.setMap(null);
+        a.poly.setMap(null);
+      }
+      areas.length = 0;
+
+      // remove walkways
+      for (const w of walkways) w.setMap(null);
+      walkways.length = 0;
+
+      // remove marker
+      if (marker) { marker.setMap(null); marker = null; }
+
+      // stop drawing
+      stopTempListeners();
+      if (tempPolyline) tempPolyline.setMap(null);
+      tempPolyline = null;
+      drawingMode = null;
+      tempPath = [];
+      selectedArea = null;
+
+      updateStats();
+      setMsg("Reset complete. Everything cleared.");
+    }
+
+    function exportJSON() {
+      const out = {
+        timestamp: new Date().toISOString(),
+        panels: [],
+        areas: [],
+        walkways: []
+      };
+
+      for (const a of areas) {
+        const path = a.poly.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
+        out.areas.push({ id: a.id, path });
+
+        for (const p of a.panels) {
+          out.panels.push({ areaId: a.id, corners: p.__corners });
+        }
+      }
+
+      for (const w of walkways) {
+        const path = w.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
+        out.walkways.push({ path });
+      }
+
+      const blob = new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "pv_layout.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setMsg("Exported JSON.");
+    }
+
+    // =========================
+    // Init
+    // =========================
+    window.initMap = function() {
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: -1.286389, lng: 36.817223 },
         zoom: 18,
-        mapTypeId: "satellite"
+        mapTypeId: "satellite",
+        gestureHandling: "greedy"
       });
 
-      document.getElementById("go").onclick = goToCoords;
-      document.getElementById("auto").onclick = autoDetect;
+      $("goBtn").addEventListener("click", goToCoords);
+
+      $("drawAreaBtn").addEventListener("click", () => {
+        if (drawingMode) return alert("Finish current drawing (double-click) first.");
+        startDrawing("area");
+      });
+
+      $("drawWalkBtn").addEventListener("click", () => {
+        if (drawingMode) return alert("Finish current drawing (double-click) first.");
+        startDrawing("walkway");
+      });
+
+      $("autoFillBtn").addEventListener("click", autoFillSelected);
+      $("clearPanelsBtn").addEventListener("click", clearPanelsSelected);
+      $("resetBtn").addEventListener("click", resetEverything);
+      $("exportBtn").addEventListener("click", exportJSON);
+
+      // click empty map to unselect
+      map.addListener("click", () => setSelectedArea(null));
+
+      setMsg("Ready. Draw an area, select it, then Auto-fill.");
+      updateStats();
     };
   </script>
 
+  <!-- Replace with your Maps JavaScript API key -->
   <script async defer
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjYkseGZMK9Ej_NiWsMZwsL72MPtIur3g&callback=initMap">
   </script>
