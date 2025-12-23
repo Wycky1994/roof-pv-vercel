@@ -152,9 +152,6 @@
   <div id="map"></div>
 
   <script>
-    // =========================
-    // GLOBALS
-    // =========================
     let map, drawingManager;
     let pinMarker = null;
 
@@ -171,9 +168,6 @@
     // Selected: { type: 'area', ref: areaObj } OR { type: 'walk', ref: polygon }
     let selected = null;
 
-    // =========================
-    // UI HELPERS
-    // =========================
     function setHint(t){ document.getElementById("hint").innerText = t || ""; }
     function setStats(t){ document.getElementById("stats").innerText = t || ""; }
 
@@ -185,12 +179,8 @@
     }
 
     function clearSelectionStyles(){
-      for(const a of areas){
-        a.poly.setOptions({ strokeWeight: 2 });
-      }
-      for(const w of walkways){
-        w.setOptions({ strokeWeight: 2 });
-      }
+      for(const a of areas){ a.poly.setOptions({ strokeWeight: 2 }); }
+      for(const w of walkways){ w.setOptions({ strokeWeight: 2 }); }
     }
 
     function selectArea(areaObj){
@@ -215,9 +205,6 @@
       updateSelectedInfo();
     }
 
-    // =========================
-    // COORDS JUMP
-    // =========================
     function goToCoords() {
       const raw = (document.getElementById("coords").value || "").trim();
       const parts = raw.split(/[\s,]+/).filter(Boolean);
@@ -239,9 +226,6 @@
       setHint(`Pinned: ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
     }
 
-    // =========================
-    // SIMPLE GEO UTILS (approx)
-    // =========================
     function metersToDegreesLat(m){ return m / 111320.0; }
     function metersToDegreesLng(m, atLatDeg){
       const c = Math.cos(atLatDeg * Math.PI/180);
@@ -281,19 +265,18 @@
         const len=Math.hypot(dx,dy);
         if(len>bestLen){ bestLen=len; bestAng=Math.atan2(dy,dx); }
       }
-      return bestAng; // angle from East/X in radians
+      return bestAng;
     }
 
     function rectCorners(center, wDegLng, hDegLat, angRad){
       const cx=center.lng, cy=center.lat;
       const hw=wDegLng/2, hh=hDegLat/2;
 
-      const pts=[{x:-hw,y:-hh},{x:hw,y:-hh},{x:hw,y:hh},{x:-hw,y:hh}].map(p=>{
+      return [{x:-hw,y:-hh},{x:hw,y:-hh},{x:hw,y:hh},{x:-hw,y:hh}].map(p=>{
         const xr=p.x*Math.cos(angRad)-p.y*Math.sin(angRad);
         const yr=p.x*Math.sin(angRad)+p.y*Math.cos(angRad);
         return {lat:cy+yr, lng:cx+xr};
       });
-      return pts;
     }
 
     function rectFits(areaPath, corners){
@@ -314,7 +297,6 @@
     }
 
     function overlapsExistingPanels(areaObj, corners){
-      // simple bbox overlap check (fast)
       const bb = polygonBounds(corners);
       for(const p of areaObj.panels){
         const rbb = polygonBounds(p.__corners);
@@ -330,9 +312,6 @@
       setStats(`Total panels placed: ${total}`);
     }
 
-    // =========================
-    // AUTO-FILL (for selected area)
-    // =========================
     function autoFillSelected(){
       if(!selected || selected.type !== "area"){
         alert("Click an AREA polygon to select it first.");
@@ -372,7 +351,6 @@
         alert("Setback too large for this area."); return;
       }
 
-      // rotation
       const rotMode = document.getElementById("rotMode").value;
       let angRad = 0;
       if(rotMode === "none") angRad = 0;
@@ -433,9 +411,6 @@
       setHint(`Cleared panels for ${areaObj.id}.`);
     }
 
-    // =========================
-    // DELETE / RESET / EXPORT
-    // =========================
     function deleteSelected(){
       if(!selected){ alert("Nothing selected."); return; }
 
@@ -459,21 +434,17 @@
     }
 
     function resetEverything(){
-      // areas + panels
       for(const a of areas){
         for(const p of a.panels) p.setMap(null);
         a.poly.setMap(null);
       }
       areas.length = 0;
 
-      // walkways
       for(const w of walkways) w.setMap(null);
       walkways.length = 0;
 
-      // marker
       if(pinMarker){ pinMarker.setMap(null); pinMarker = null; }
 
-      // drawing
       drawMode = DRAW_NONE;
       drawingManager.setDrawingMode(null);
 
@@ -483,12 +454,7 @@
     }
 
     function exportJSON(){
-      const out = {
-        timestamp: new Date().toISOString(),
-        areas: [],
-        walkways: [],
-        panels: []
-      };
+      const out = { timestamp: new Date().toISOString(), areas: [], walkways: [], panels: [] };
 
       for(const a of areas){
         out.areas.push({ id: a.id, path: polygonToPath(a.poly) });
@@ -513,9 +479,6 @@
       setHint("Exported JSON.");
     }
 
-    // =========================
-    // DRAWING (This is the good polygon UX you liked)
-    // =========================
     function startDraw(mode){
       drawMode = mode;
       drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
@@ -530,9 +493,6 @@
       setHint("Drawing stopped.");
     }
 
-    // =========================
-    // INIT MAP
-    // =========================
     function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: -1.286389, lng: 36.817223 },
@@ -544,14 +504,10 @@
       drawingManager = new google.maps.drawing.DrawingManager({
         drawingMode: null,
         drawingControl: false,
-        polygonOptions: {
-          editable: true,
-          clickable: true
-        }
+        polygonOptions: { editable: true, clickable: true }
       });
       drawingManager.setMap(map);
 
-      // overlaycomplete = the reliable "highlighted polygon" behavior
       google.maps.event.addListener(drawingManager, "overlaycomplete", (e) => {
         if (e.type !== google.maps.drawing.OverlayType.POLYGON) return;
 
@@ -569,11 +525,10 @@
           const areaObj = { id: `area_${Date.now()}`, poly, panels: [] };
           areas.push(areaObj);
 
-          // click to select
           poly.addListener("click", () => selectArea(areaObj));
           selectArea(areaObj);
 
-          // keep drawing enabled so you can immediately draw next side if you want
+          // keep drawing on so you can draw the next side immediately
           drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
           setHint("Area saved. Click Auto-fill, or draw the next side (previous stays).");
         }
@@ -596,10 +551,8 @@
         }
       });
 
-      // click empty map to unselect
       map.addListener("click", () => unselectAll());
 
-      // UI hooks
       document.getElementById("btnGoCoords").addEventListener("click", goToCoords);
       document.getElementById("coords").addEventListener("keydown", (e) => { if (e.key === "Enter") goToCoords(); });
 
@@ -619,12 +572,9 @@
     }
   </script>
 
-  <!-- IMPORTANT:
-       1) Put your Google Maps JavaScript API key below.
-       2) Ensure Maps JavaScript API is enabled in Google Cloud.
-       3) Ensure the key allows your Vercel domain in HTTP referrers. -->
-  <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=PASTE_YOUR_MAPS_JS_API_KEY_HERE&libraries=drawing&callback=initMap">
+  <!-- Replace YOUR_MAPS_JS_KEY_HERE with your temporary key -->
+ <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjYkseGZMK9Ej_NiWsMZwsL72MPtIur3g&libraries=drawing&callback=initMap">
   </script>
 </body>
 </html>
