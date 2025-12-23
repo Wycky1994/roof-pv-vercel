@@ -1,441 +1,358 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
   <meta charset="utf-8" />
+  <title>PV Layout Tool (Multi Areas + Walkways + Auto-Fill)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Roof / Ground PV Layout Tool</title>
 
   <style>
     html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
     #map { height: 100%; width: 100%; }
 
-    .ui {
-      position: absolute; top: 12px; left: 12px; z-index: 10;
-      width: 420px; max-height: calc(100% - 24px);
-      overflow: auto;
-      background: rgba(255,255,255,0.95);
-      padding: 12px; border-radius: 14px;
-      box-shadow: 0 10px 28px rgba(0,0,0,0.25);
+    .panel{
+      position:absolute; top:12px; left:12px;
+      background:rgba(255,255,255,0.94);
+      padding:10px 12px; border-radius:12px;
+      box-shadow:0 8px 22px rgba(0,0,0,0.18);
+      z-index:5; width:420px;
+      max-height:calc(100% - 24px);
+      overflow:auto;
     }
-
-    .row { display: flex; gap: 10px; }
-    .row > div { flex: 1; }
-
-    label { font-size: 12px; color: #222; display: block; margin-top: 10px; }
-    input, select, button {
-      width: 100%; box-sizing: border-box;
-      padding: 10px; border-radius: 10px;
-      border: 1px solid #cfcfcf;
-      font-size: 14px;
-      background: #fff;
+    .row{ display:flex; gap:8px; margin:8px 0; }
+    .row>div{ flex:1; }
+    label{ font-size:12px; color:#222; display:block; margin-bottom:4px; }
+    input,select{
+      width:100%; padding:8px; box-sizing:border-box;
+      border-radius:10px; border:1px solid #ccc;
+      font-size:14px;
     }
-
-    button { cursor: pointer; border: 0; background: #111; color: #fff; }
-    button.secondary { background: #eaeaea; color: #111; border: 1px solid #cfcfcf; }
-    button.danger { background: #c62828; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .hint {
-      font-size: 12px; color: #333;
-      margin-top: 8px; line-height: 1.35;
+    button{
+      width:100%; padding:10px; cursor:pointer; margin-top:8px;
+      border-radius:12px; border:1px solid #bbb; background:#f5f5f5;
+      font-weight:600;
     }
+    button:hover{ background:#eee; }
+    button.primary{ background:#111; color:#fff; border:0; }
+    button.primary:hover{ background:#000; }
+    button.danger{ background:#c62828; color:#fff; border:0; }
+    button.danger:hover{ background:#a61f1f; }
 
-    .badge {
-      display:inline-block; padding: 4px 8px;
-      background:#f2f2f2; border:1px solid #ddd;
-      border-radius: 999px; font-size: 12px; margin-right: 6px;
+    small{ color:#444; line-height:1.35; display:block; margin-top:6px; }
+    .pill{
+      display:inline-block; padding:3px 8px; border-radius:999px;
+      background:#f0f0f0; border:1px solid #ddd; font-size:12px;
+      margin-right:6px; margin-top:6px;
     }
-
-    .divider { height: 1px; background: #e7e7e7; margin: 12px 0; }
-
-    .small { font-size: 12px; color:#444; }
-
-    .stat { margin-top: 8px; font-size: 13px; }
-    .stat b { font-size: 14px; }
-
-    .mode {
-      display:flex; gap: 8px; margin-top: 8px;
+    .stats{ margin-top:10px; font-weight:bold; }
+    .hint{ font-weight:normal; margin-top:6px; color:#333; }
+    .sectionTitle{
+      font-weight:bold; margin-top:10px;
+      padding-top:8px; border-top:1px solid #e5e5e5;
     }
-    .mode button { flex:1; }
+    .selectedBadge{
+      display:inline-block; margin-left:8px;
+      padding:3px 8px; border-radius:999px;
+      border:1px solid #ddd; background:#fafafa; font-size:12px;
+    }
   </style>
 </head>
 
 <body>
-  <div class="ui">
-    <div style="font-size:18px;font-weight:700;">PV Layout Tool</div>
-    <div class="small">Draw multiple roof sides / ground areas, add walkways, then auto-fill panels per area.</div>
-
-    <div class="divider"></div>
-
-    <label>Find location (lat, lng)</label>
-    <div class="row">
-      <div style="flex:2;">
-        <input id="coords" value="-1.2981371, 36.8907759" />
-      </div>
-      <div>
-        <button id="goBtn" class="secondary">Go</button>
-      </div>
+  <div class="panel">
+    <div class="sectionTitle" style="border-top:none; padding-top:0; margin-top:0;">
+      Find location
     </div>
 
-    <div class="divider"></div>
+    <div class="row">
+      <div style="flex:1.6;">
+        <label>Coordinates (lat, lng)</label>
+        <input id="coords" type="text" value="-1.2981371, 36.8907759" placeholder="-1.2981371, 36.8907759">
+      </div>
+      <div style="flex:0.9;">
+        <label>&nbsp;</label>
+        <button id="btnGoCoords" style="margin-top:0;">Go</button>
+      </div>
+    </div>
+    <small>Paste as <b>lat, lng</b> then click Go.</small>
+
+    <div class="sectionTitle">
+      Panel / Layout
+      <span class="selectedBadge" id="selInfo">Selected area: none</span>
+    </div>
 
     <div class="row">
       <div>
         <label>Panel Length (m)</label>
-        <input id="pLen" type="number" step="0.001" value="2.279" />
+        <input id="pLen" type="number" step="0.001" value="2.279">
       </div>
       <div>
         <label>Panel Width (m)</label>
-        <input id="pWid" type="number" step="0.001" value="1.134" />
+        <input id="pWid" type="number" step="0.001" value="1.134">
       </div>
     </div>
 
     <div class="row">
       <div>
         <label>Gap between panels (m)</label>
-        <input id="gap" type="number" step="0.001" value="0.02" />
+        <input id="gap" type="number" step="0.001" value="0.02">
       </div>
       <div>
         <label>Edge setback (m)</label>
-        <input id="setback" type="number" step="0.01" value="0.30" />
+        <input id="setback" type="number" step="0.01" value="0.30">
       </div>
     </div>
 
-    <label>Rotation Mode</label>
     <div class="row">
       <div>
+        <label>Rotation Mode</label>
         <select id="rotMode">
-          <option value="auto">Auto-rotate (best fit)</option>
+          <option value="auto" selected>Auto (longest edge)</option>
           <option value="manual">Manual angle</option>
+          <option value="none">No rotation (0°)</option>
         </select>
       </div>
       <div>
-        <label style="margin-top:0;">Manual angle (deg)</label>
-        <input id="manualAngle" type="number" step="1" value="0" />
+        <label>Manual angle (deg, from East/X)</label>
+        <input id="manualAngle" type="number" step="0.1" value="0">
       </div>
     </div>
 
-    <div class="hint">
-      <span class="badge">Tip</span>
-      Auto-rotate uses the roof polygon’s main direction. Manual angle is useful when satellite image is rotated or for special layouts.
+    <div class="sectionTitle">Draw / Actions</div>
+
+    <div class="row">
+      <div><button id="btnDrawArea">Draw Roof / Ground Area</button></div>
+      <div><button id="btnDrawWalk">Draw Walkway / No-Go</button></div>
     </div>
 
-    <div class="divider"></div>
-
-    <div style="font-weight:700;">Draw / Actions</div>
-
-    <div class="mode">
-      <button id="drawAreaBtn" class="secondary">Draw Roof / Ground Area</button>
-      <button id="drawWalkBtn" class="secondary">Draw Walkway / No-Go</button>
+    <div class="row">
+      <div><button id="btnStopDraw">Stop Drawing</button></div>
+      <div><button id="btnDeleteSelected">Delete Selected</button></div>
     </div>
 
-    <div class="row" style="margin-top:8px;">
-      <div>
-        <button id="autoFillBtn">Auto-fill Panels (Selected Area)</button>
-      </div>
-      <div>
-        <button id="clearPanelsBtn" class="secondary">Clear Panels (Selected)</button>
-      </div>
+    <button class="primary" id="btnFill">Auto-fill Panels (Selected Area)</button>
+
+    <div class="row">
+      <div><button id="btnClearAreaPanels">Clear Panels (Selected)</button></div>
+      <div><button id="btnExport">Export JSON</button></div>
     </div>
 
-    <div class="row" style="margin-top:8px;">
-      <div>
-        <button id="exportBtn" class="secondary">Export JSON</button>
-      </div>
-      <div>
-        <button id="resetBtn" class="danger">Reset Everything</button>
-      </div>
-    </div>
+    <button class="danger" id="btnReset">Reset Everything</button>
 
-    <div class="hint">
-      <b>Workflow:</b><br>
-      1) Click <b>Draw Roof / Ground Area</b>, draw one side, double-click to finish.<br>
-      2) Click the polygon to <b>select it</b>, then click <b>Auto-fill Panels</b>.<br>
-      3) Draw the next side. It will stay. Repeat.<br>
-      4) Use <b>Draw Walkway / No-Go</b> to cut out paths, skylights, tanks, access lanes, etc.
-    </div>
+    <small>
+      <span class="pill">1</span> Click <b>Draw Roof / Ground Area</b> and draw polygon (click first point to close).<br/>
+      <span class="pill">2</span> Click the polygon to <b>select</b> it (thicker outline).<br/>
+      <span class="pill">3</span> Click <b>Auto-fill</b>. Then draw the next side and repeat (nothing disappears).<br/>
+      <span class="pill">4</span> Use <b>Walkway / No-Go</b> polygons for access paths, tanks, skylights; panels avoid them.
+    </small>
 
-    <div class="stat" id="stats"><b>Panels placed:</b> 0</div>
-    <div class="hint" id="msg"></div>
+    <div id="stats" class="stats"></div>
+    <div id="hint" class="hint"></div>
   </div>
 
   <div id="map"></div>
 
   <script>
     // =========================
-    // Globals
+    // GLOBALS
     // =========================
-    let map, marker = null;
+    let map, drawingManager;
+    let pinMarker = null;
 
-    // We store many independent "areas" (roof sides / ground blocks)
-    // Each area = { poly, panels: [rect...], id }
+    const DRAW_NONE = null;
+    const DRAW_AREA = "area";
+    const DRAW_WALK = "walk";
+    let drawMode = DRAW_NONE;
+
+    // Areas: { id, poly, panels[] }
     const areas = [];
-
-    // Walkways / no-go zones apply globally (they block panel placement)
-    // Each walkway = polygon
+    // Walkways / No-Go polygons
     const walkways = [];
 
-    // Current selection
-    let selectedArea = null;
-
-    // Drawing state
-    let drawingMode = null; // 'area' | 'walkway' | null
-    let tempPath = [];
-    let tempPolyline = null;
-    let tempClicks = [];
+    // Selected: { type: 'area', ref: areaObj } OR { type: 'walk', ref: polygon }
+    let selected = null;
 
     // =========================
-    // Helpers
+    // UI HELPERS
     // =========================
-    const $ = (id) => document.getElementById(id);
+    function setHint(t){ document.getElementById("hint").innerText = t || ""; }
+    function setStats(t){ document.getElementById("stats").innerText = t || ""; }
 
-    function setMsg(t) { $("msg").innerText = t || ""; }
+    function updateSelectedInfo(){
+      const el = document.getElementById("selInfo");
+      if(!selected) el.innerText = "Selected area: none";
+      else if(selected.type === "area") el.innerText = `Selected area: ${selected.ref.id}`;
+      else el.innerText = "Selected: walkway/no-go";
+    }
 
-    function parseCoords() {
-      const raw = ($("coords").value || "").trim();
+    function clearSelectionStyles(){
+      for(const a of areas){
+        a.poly.setOptions({ strokeWeight: 2 });
+      }
+      for(const w of walkways){
+        w.setOptions({ strokeWeight: 2 });
+      }
+    }
+
+    function selectArea(areaObj){
+      selected = { type:"area", ref: areaObj };
+      clearSelectionStyles();
+      areaObj.poly.setOptions({ strokeWeight: 4 });
+      updateSelectedInfo();
+      setHint("Area selected. Click Auto-fill Panels.");
+    }
+
+    function selectWalkway(poly){
+      selected = { type:"walk", ref: poly };
+      clearSelectionStyles();
+      poly.setOptions({ strokeWeight: 4 });
+      updateSelectedInfo();
+      setHint("Walkway/no-go selected. You can delete it if needed.");
+    }
+
+    function unselectAll(){
+      selected = null;
+      clearSelectionStyles();
+      updateSelectedInfo();
+    }
+
+    // =========================
+    // COORDS JUMP
+    // =========================
+    function goToCoords() {
+      const raw = (document.getElementById("coords").value || "").trim();
       const parts = raw.split(/[\s,]+/).filter(Boolean);
-      if (parts.length < 2) return null;
+      if (parts.length < 2) { alert("Enter coordinates as: -1.2981371, 36.8907759"); return; }
+
       const lat = parseFloat(parts[0]);
       const lng = parseFloat(parts[1]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-      return { lat, lng };
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        alert("Invalid coordinates."); return;
+      }
+
+      const pos = new google.maps.LatLng(lat, lng);
+      map.panTo(pos);
+      map.setZoom(Math.max(map.getZoom() || 18, 20));
+
+      if (pinMarker) pinMarker.setMap(null);
+      pinMarker = new google.maps.Marker({ position: pos, map, title: `${lat.toFixed(6)}, ${lng.toFixed(6)}` });
+
+      setHint(`Pinned: ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
     }
 
-    function goToCoords() {
-      const c = parseCoords();
-      if (!c) return alert("Enter coordinates like: -1.2981371, 36.8907759");
-      const pos = { lat: c.lat, lng: c.lng };
-      map.setCenter(pos);
-      map.setZoom(20);
-      if (marker) marker.setMap(null);
-      marker = new google.maps.Marker({ position: pos, map });
-      setMsg("Pinned location. Now draw roof/ground areas.");
-    }
-
-    function metersToDegreesLat(m) {
-      // 1 deg lat ~ 111,320m
-      return m / 111320.0;
-    }
-
-    function metersToDegreesLng(m, atLatDeg) {
-      // 1 deg lng ~ 111,320m * cos(lat)
-      const c = Math.cos(atLatDeg * Math.PI / 180.0);
+    // =========================
+    // SIMPLE GEO UTILS (approx)
+    // =========================
+    function metersToDegreesLat(m){ return m / 111320.0; }
+    function metersToDegreesLng(m, atLatDeg){
+      const c = Math.cos(atLatDeg * Math.PI/180);
       return m / (111320.0 * Math.max(0.00001, c));
     }
 
-    function polygonBoundsLatLng(path) {
-      let minLat=Infinity, maxLat=-Infinity, minLng=Infinity, maxLng=-Infinity;
-      for (const p of path) {
-        minLat = Math.min(minLat, p.lat);
-        maxLat = Math.max(maxLat, p.lat);
-        minLng = Math.min(minLng, p.lng);
-        maxLng = Math.max(maxLng, p.lng);
-      }
-      return { minLat, maxLat, minLng, maxLng };
+    function polygonToPath(poly){
+      return poly.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
     }
 
-    function pointInPoly(pt, polyPath) {
-      // Ray casting algorithm on lat/lng plane
+    function polygonBounds(path){
+      let minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
+      for(const p of path){
+        minLat=Math.min(minLat,p.lat); maxLat=Math.max(maxLat,p.lat);
+        minLng=Math.min(minLng,p.lng); maxLng=Math.max(maxLng,p.lng);
+      }
+      return {minLat,maxLat,minLng,maxLng};
+    }
+
+    function pointInPoly(pt, polyPath){
       let x = pt.lng, y = pt.lat;
       let inside = false;
-      for (let i=0, j=polyPath.length-1; i<polyPath.length; j=i++) {
-        const xi = polyPath[i].lng, yi = polyPath[i].lat;
-        const xj = polyPath[j].lng, yj = polyPath[j].lat;
-        const intersect = ((yi > y) !== (yj > y)) &&
-          (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
-        if (intersect) inside = !inside;
+      for(let i=0, j=polyPath.length-1; i<polyPath.length; j=i++){
+        const xi=polyPath[i].lng, yi=polyPath[i].lat;
+        const xj=polyPath[j].lng, yj=polyPath[j].lat;
+        const intersect = ((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-12) + xi);
+        if(intersect) inside = !inside;
       }
       return inside;
     }
 
-    function rectCorners(center, wDegLng, hDegLat, angleRad) {
-      // rectangle centered at center (lat/lng), width along x (lng), height along y (lat), rotated angleRad
-      const cx = center.lng, cy = center.lat;
-      const hw = wDegLng / 2, hh = hDegLat / 2;
+    function longestEdgeAngleRad(path){
+      let bestLen=-1, bestAng=0;
+      for(let i=0; i<path.length; i++){
+        const a=path[i], b=path[(i+1)%path.length];
+        const dx=b.lng-a.lng, dy=b.lat-a.lat;
+        const len=Math.hypot(dx,dy);
+        if(len>bestLen){ bestLen=len; bestAng=Math.atan2(dy,dx); }
+      }
+      return bestAng; // angle from East/X in radians
+    }
 
-      const pts = [
-        {x: -hw, y: -hh},
-        {x:  hw, y: -hh},
-        {x:  hw, y:  hh},
-        {x: -hw, y:  hh},
-      ].map(p => {
-        const xr = p.x * Math.cos(angleRad) - p.y * Math.sin(angleRad);
-        const yr = p.x * Math.sin(angleRad) + p.y * Math.cos(angleRad);
-        return { lat: cy + yr, lng: cx + xr };
+    function rectCorners(center, wDegLng, hDegLat, angRad){
+      const cx=center.lng, cy=center.lat;
+      const hw=wDegLng/2, hh=hDegLat/2;
+
+      const pts=[{x:-hw,y:-hh},{x:hw,y:-hh},{x:hw,y:hh},{x:-hw,y:hh}].map(p=>{
+        const xr=p.x*Math.cos(angRad)-p.y*Math.sin(angRad);
+        const yr=p.x*Math.sin(angRad)+p.y*Math.cos(angRad);
+        return {lat:cy+yr, lng:cx+xr};
       });
-
       return pts;
     }
 
-    function rectFits(polyPath, corners) {
-      // All corners inside area polygon
-      for (const c of corners) {
-        if (!pointInPoly(c, polyPath)) return false;
+    function rectFits(areaPath, corners){
+      for(const c of corners){
+        if(!pointInPoly(c, areaPath)) return false;
       }
       return true;
     }
 
-    function overlapsWalkway(corners) {
-      // simple test: if rectangle center or any corner is inside any walkway polygon
-      // (approx but works well for walkway exclusion)
-      for (const w of walkways) {
-        const wPath = w.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
-        for (const c of corners) {
-          if (pointInPoly(c, wPath)) return true;
+    function overlapsWalkways(corners){
+      for(const w of walkways){
+        const wp = polygonToPath(w);
+        for(const c of corners){
+          if(pointInPoly(c, wp)) return true;
         }
       }
       return false;
     }
 
-    function overlapsAnyPanel(area, corners) {
-      // Panel overlap check using bounding boxes of corners (approx)
-      const bb = polygonBoundsLatLng(corners);
-      for (const r of area.panels) {
-        const rp = r.__corners;
-        const rbb = polygonBoundsLatLng(rp);
-        const overlap = !(bb.maxLat < rbb.minLat || bb.minLat > rbb.maxLat || bb.maxLng < rbb.minLng || bb.minLng > rbb.maxLng);
-        if (overlap) return true;
+    function overlapsExistingPanels(areaObj, corners){
+      // simple bbox overlap check (fast)
+      const bb = polygonBounds(corners);
+      for(const p of areaObj.panels){
+        const rbb = polygonBounds(p.__corners);
+        const overlap = !(bb.maxLat<rbb.minLat || bb.minLat>rbb.maxLat || bb.maxLng<rbb.minLng || bb.minLng>rbb.maxLng);
+        if(overlap) return true;
       }
       return false;
     }
 
-    function mainAxisAngle(polyPath) {
-      // PCA-like: use the longest edge direction as a robust main direction
-      let bestLen = -1, bestAng = 0;
-      for (let i=0; i<polyPath.length; i++) {
-        const a = polyPath[i];
-        const b = polyPath[(i+1) % polyPath.length];
-        const dx = (b.lng - a.lng);
-        const dy = (b.lat - a.lat);
-        const len = Math.hypot(dx, dy);
-        if (len > bestLen) {
-          bestLen = len;
-          bestAng = Math.atan2(dy, dx); // radians in lat/lng plane
-        }
-      }
-      return bestAng;
-    }
-
-    function setSelectedArea(areaObj) {
-      selectedArea = areaObj;
-      for (const a of areas) {
-        a.poly.setOptions({ strokeWeight: (a === selectedArea) ? 4 : 2 });
-      }
-      setMsg(selectedArea ? "Selected area. Now Auto-fill panels, or add walkways." : "");
-    }
-
-    function updateStats() {
-      let total = 0;
-      for (const a of areas) total += a.panels.length;
-      $("stats").innerHTML = `<b>Panels placed:</b> ${total}`;
+    function updateTotalPanels(){
+      let total=0;
+      for(const a of areas) total += a.panels.length;
+      setStats(`Total panels placed: ${total}`);
     }
 
     // =========================
-    // Drawing (polygons)
+    // AUTO-FILL (for selected area)
     // =========================
-    function startDrawing(mode) {
-      drawingMode = mode; // 'area' or 'walkway'
-      tempPath = [];
-      setSelectedArea(selectedArea); // keep selection visuals
-      setMsg(mode === 'area'
-        ? "Drawing area: click points, double-click to finish."
-        : "Drawing walkway/no-go: click points, double-click to finish."
-      );
-
-      if (tempPolyline) tempPolyline.setMap(null);
-      tempPolyline = new google.maps.Polyline({
-        map,
-        path: [],
-        strokeColor: mode === 'area' ? "#00b894" : "#d63031",
-        strokeOpacity: 1,
-        strokeWeight: 2
-      });
-
-      // map click listener
-      tempClicks.push(map.addListener("click", (e) => {
-        if (!drawingMode) return;
-        tempPath.push({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-        tempPolyline.setPath(tempPath);
-      }));
-
-      // double-click ends polygon
-      tempClicks.push(map.addListener("dblclick", (e) => {
-        if (!drawingMode) return;
-        // Prevent default zoom
-        e.stop();
-        finishDrawing();
-      }));
-    }
-
-    function stopTempListeners() {
-      for (const l of tempClicks) google.maps.event.removeListener(l);
-      tempClicks = [];
-    }
-
-    function finishDrawing() {
-      if (!drawingMode) return;
-      stopTempListeners();
-
-      if (tempPolyline) tempPolyline.setMap(null);
-      tempPolyline = null;
-
-      if (tempPath.length < 3) {
-        drawingMode = null;
-        tempPath = [];
-        setMsg("Need at least 3 points.");
+    function autoFillSelected(){
+      if(!selected || selected.type !== "area"){
+        alert("Click an AREA polygon to select it first.");
         return;
       }
 
-      const poly = new google.maps.Polygon({
-        map,
-        paths: tempPath,
-        strokeColor: drawingMode === 'area' ? "#00b894" : "#d63031",
-        strokeOpacity: 1,
-        strokeWeight: 2,
-        fillColor: drawingMode === 'area' ? "#00b894" : "#d63031",
-        fillOpacity: 0.20,
-        clickable: true,
-        editable: true
-      });
+      const areaObj = selected.ref;
+      const areaPath = polygonToPath(areaObj.poly);
 
-      if (drawingMode === 'area') {
-        const areaObj = { id: `area_${Date.now()}`, poly, panels: [] };
-        areas.push(areaObj);
+      const pLen = parseFloat(document.getElementById("pLen").value);
+      const pWid = parseFloat(document.getElementById("pWid").value);
+      const gap = parseFloat(document.getElementById("gap").value);
+      const setback = parseFloat(document.getElementById("setback").value);
 
-        poly.addListener("click", () => setSelectedArea(areaObj));
-        poly.addListener("rightclick", () => setSelectedArea(areaObj));
-
-        setSelectedArea(areaObj);
-        setMsg("Area saved. You can draw another side, or Auto-fill this selected area.");
-      } else {
-        walkways.push(poly);
-        setMsg("Walkway/No-Go saved. Panels will avoid it.");
+      if(![pLen,pWid,gap,setback].every(Number.isFinite)){
+        alert("Check panel inputs."); return;
       }
 
-      drawingMode = null;
-      tempPath = [];
-      updateStats();
-    }
-
-    // =========================
-    // Panel filling
-    // =========================
-    function autoFillSelected() {
-      if (!selectedArea) return alert("Select an area polygon first (click it).");
-
-      const pLen = parseFloat($("pLen").value);
-      const pWid = parseFloat($("pWid").value);
-      const gap = parseFloat($("gap").value);
-      const setback = parseFloat($("setback").value);
-
-      if (![pLen, pWid, gap, setback].every(Number.isFinite)) {
-        return alert("Check panel size, gap and setback inputs.");
-      }
-
-      // Convert meters to degrees (approx using center latitude)
-      const path = selectedArea.poly.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
-      const bounds = polygonBoundsLatLng(path);
-      const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+      const bounds = polygonBounds(areaPath);
+      const centerLat = (bounds.minLat + bounds.maxLat)/2;
 
       const cellWm = pWid + gap;
       const cellHm = pLen + gap;
@@ -443,136 +360,144 @@
       const cellW = metersToDegreesLng(cellWm, centerLat);
       const cellH = metersToDegreesLat(cellHm);
 
-      // setback degrees (approx)
       const sbLat = metersToDegreesLat(setback);
       const sbLng = metersToDegreesLng(setback, centerLat);
 
-      // Shrink bounding scan area by setback
       const scanMinLat = bounds.minLat + sbLat;
       const scanMaxLat = bounds.maxLat - sbLat;
       const scanMinLng = bounds.minLng + sbLng;
       const scanMaxLng = bounds.maxLng - sbLng;
 
-      if (scanMaxLat <= scanMinLat || scanMaxLng <= scanMinLng) {
-        return alert("Setback too large for this area.");
+      if(scanMaxLat <= scanMinLat || scanMaxLng <= scanMinLng){
+        alert("Setback too large for this area."); return;
       }
 
-      // rotation angle
-      let angleRad = 0;
-      if ($("rotMode").value === "manual") {
-        angleRad = (parseFloat($("manualAngle").value) || 0) * Math.PI / 180.0;
+      // rotation
+      const rotMode = document.getElementById("rotMode").value;
+      let angRad = 0;
+      if(rotMode === "none") angRad = 0;
+      else if(rotMode === "manual"){
+        const deg = parseFloat(document.getElementById("manualAngle").value) || 0;
+        angRad = deg * Math.PI/180;
       } else {
-        // auto: follow longest edge direction
-        angleRad = mainAxisAngle(path);
+        angRad = longestEdgeAngleRad(areaPath);
       }
 
-      // Panel rectangle size in degrees:
-      // width along "x (lng)" and height along "y (lat)" before rotation.
       const rectW = metersToDegreesLng(pWid, centerLat);
       const rectH = metersToDegreesLat(pLen);
 
       let placed = 0;
-      const maxTries = 60000; // safety
+      const maxTries = 90000;
       let tries = 0;
 
-      // Scan centers in a grid
-      for (let lat = scanMinLat; lat <= scanMaxLat; lat += cellH) {
-        for (let lng = scanMinLng; lng <= scanMaxLng; lng += cellW) {
-          if (tries++ > maxTries) break;
+      for(let lat = scanMinLat; lat <= scanMaxLat; lat += cellH){
+        for(let lng = scanMinLng; lng <= scanMaxLng; lng += cellW){
+          if(tries++ > maxTries) break;
 
-          const center = { lat, lng };
-          const corners = rectCorners(center, rectW, rectH, angleRad);
+          const center = {lat, lng};
+          const corners = rectCorners(center, rectW, rectH, angRad);
 
-          // inside selected area
-          if (!rectFits(path, corners)) continue;
+          if(!rectFits(areaPath, corners)) continue;
+          if(overlapsWalkways(corners)) continue;
+          if(overlapsExistingPanels(areaObj, corners)) continue;
 
-          // avoid walkways
-          if (overlapsWalkway(corners)) continue;
-
-          // avoid already placed panels in this area
-          if (overlapsAnyPanel(selectedArea, corners)) continue;
-
-          // draw panel as polygon
-          const panelPoly = new google.maps.Polygon({
-            map,
+          const poly = new google.maps.Polygon({
             paths: corners,
-            strokeColor: "#0984e3",
-            strokeOpacity: 1,
+            map,
+            strokeColor: "#00bfff",
+            strokeOpacity: 0.9,
             strokeWeight: 1,
-            fillColor: "#0984e3",
-            fillOpacity: 0.35,
+            fillColor: "#00bfff",
+            fillOpacity: 0.25,
             clickable: false
           });
-
-          panelPoly.__corners = corners; // store for overlap tests
-          selectedArea.panels.push(panelPoly);
+          poly.__corners = corners;
+          areaObj.panels.push(poly);
           placed++;
         }
-        if (tries > maxTries) break;
+        if(tries > maxTries) break;
       }
 
-      updateStats();
-      setMsg(`Auto-fill complete for selected area. Added ${placed} panels.`);
+      updateTotalPanels();
+      setHint(`Auto-fill complete for ${areaObj.id}. Added ${placed} panels.`);
     }
 
-    function clearPanelsSelected() {
-      if (!selectedArea) return alert("Select an area polygon first.");
-      for (const p of selectedArea.panels) p.setMap(null);
-      selectedArea.panels = [];
-      updateStats();
-      setMsg("Cleared panels for selected area.");
+    function clearPanelsSelected(){
+      if(!selected || selected.type !== "area"){
+        alert("Select an AREA first."); return;
+      }
+      const areaObj = selected.ref;
+      for(const p of areaObj.panels) p.setMap(null);
+      areaObj.panels = [];
+      updateTotalPanels();
+      setHint(`Cleared panels for ${areaObj.id}.`);
     }
 
     // =========================
-    // Reset + Export
+    // DELETE / RESET / EXPORT
     // =========================
-    function resetEverything() {
-      // remove areas + panels
-      for (const a of areas) {
-        for (const p of a.panels) p.setMap(null);
+    function deleteSelected(){
+      if(!selected){ alert("Nothing selected."); return; }
+
+      if(selected.type === "area"){
+        const a = selected.ref;
+        for(const p of a.panels) p.setMap(null);
+        a.poly.setMap(null);
+        const idx = areas.indexOf(a);
+        if(idx >= 0) areas.splice(idx,1);
+        unselectAll();
+        updateTotalPanels();
+        setHint("Deleted selected area.");
+      } else {
+        const w = selected.ref;
+        w.setMap(null);
+        const idx = walkways.indexOf(w);
+        if(idx >= 0) walkways.splice(idx,1);
+        unselectAll();
+        setHint("Deleted selected walkway/no-go.");
+      }
+    }
+
+    function resetEverything(){
+      // areas + panels
+      for(const a of areas){
+        for(const p of a.panels) p.setMap(null);
         a.poly.setMap(null);
       }
       areas.length = 0;
 
-      // remove walkways
-      for (const w of walkways) w.setMap(null);
+      // walkways
+      for(const w of walkways) w.setMap(null);
       walkways.length = 0;
 
-      // remove marker
-      if (marker) { marker.setMap(null); marker = null; }
+      // marker
+      if(pinMarker){ pinMarker.setMap(null); pinMarker = null; }
 
-      // stop drawing
-      stopTempListeners();
-      if (tempPolyline) tempPolyline.setMap(null);
-      tempPolyline = null;
-      drawingMode = null;
-      tempPath = [];
-      selectedArea = null;
+      // drawing
+      drawMode = DRAW_NONE;
+      drawingManager.setDrawingMode(null);
 
-      updateStats();
-      setMsg("Reset complete. Everything cleared.");
+      unselectAll();
+      updateTotalPanels();
+      setHint("Reset complete. Everything cleared.");
     }
 
-    function exportJSON() {
+    function exportJSON(){
       const out = {
         timestamp: new Date().toISOString(),
-        panels: [],
         areas: [],
-        walkways: []
+        walkways: [],
+        panels: []
       };
 
-      for (const a of areas) {
-        const path = a.poly.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
-        out.areas.push({ id: a.id, path });
-
-        for (const p of a.panels) {
+      for(const a of areas){
+        out.areas.push({ id: a.id, path: polygonToPath(a.poly) });
+        for(const p of a.panels){
           out.panels.push({ areaId: a.id, corners: p.__corners });
         }
       }
-
-      for (const w of walkways) {
-        const path = w.getPath().getArray().map(p => ({lat:p.lat(), lng:p.lng()}));
-        out.walkways.push({ path });
+      for(const w of walkways){
+        out.walkways.push({ path: polygonToPath(w) });
       }
 
       const blob = new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
@@ -585,48 +510,121 @@
       a.remove();
       URL.revokeObjectURL(url);
 
-      setMsg("Exported JSON.");
+      setHint("Exported JSON.");
     }
 
     // =========================
-    // Init
+    // DRAWING (This is the good polygon UX you liked)
     // =========================
-    window.initMap = function() {
+    function startDraw(mode){
+      drawMode = mode;
+      drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+
+      if(mode === DRAW_AREA) setHint("Drawing AREA: click corners, then click first point to close (or double-click).");
+      if(mode === DRAW_WALK) setHint("Drawing WALKWAY/NO-GO: draw polygon and close it.");
+    }
+
+    function stopDraw(){
+      drawMode = DRAW_NONE;
+      drawingManager.setDrawingMode(null);
+      setHint("Drawing stopped.");
+    }
+
+    // =========================
+    // INIT MAP
+    // =========================
+    function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: -1.286389, lng: 36.817223 },
-        zoom: 18,
+        zoom: 20,
         mapTypeId: "satellite",
-        gestureHandling: "greedy"
+        disableDoubleClickZoom: true
       });
 
-      $("goBtn").addEventListener("click", goToCoords);
-
-      $("drawAreaBtn").addEventListener("click", () => {
-        if (drawingMode) return alert("Finish current drawing (double-click) first.");
-        startDrawing("area");
+      drawingManager = new google.maps.drawing.DrawingManager({
+        drawingMode: null,
+        drawingControl: false,
+        polygonOptions: {
+          editable: true,
+          clickable: true
+        }
       });
+      drawingManager.setMap(map);
 
-      $("drawWalkBtn").addEventListener("click", () => {
-        if (drawingMode) return alert("Finish current drawing (double-click) first.");
-        startDrawing("walkway");
+      // overlaycomplete = the reliable "highlighted polygon" behavior
+      google.maps.event.addListener(drawingManager, "overlaycomplete", (e) => {
+        if (e.type !== google.maps.drawing.OverlayType.POLYGON) return;
+
+        const poly = e.overlay;
+
+        if(drawMode === DRAW_AREA){
+          poly.setOptions({
+            fillColor: "#00ff88",
+            fillOpacity: 0.15,
+            strokeColor: "#00ff88",
+            strokeWeight: 2,
+            editable: true
+          });
+
+          const areaObj = { id: `area_${Date.now()}`, poly, panels: [] };
+          areas.push(areaObj);
+
+          // click to select
+          poly.addListener("click", () => selectArea(areaObj));
+          selectArea(areaObj);
+
+          // keep drawing enabled so you can immediately draw next side if you want
+          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+          setHint("Area saved. Click Auto-fill, or draw the next side (previous stays).");
+        }
+
+        if(drawMode === DRAW_WALK){
+          poly.setOptions({
+            fillColor: "#ff3355",
+            fillOpacity: 0.22,
+            strokeColor: "#ff3355",
+            strokeWeight: 2,
+            editable: true
+          });
+
+          walkways.push(poly);
+          poly.addListener("click", () => selectWalkway(poly));
+          selectWalkway(poly);
+
+          drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+          setHint("Walkway/no-go saved. Panels will avoid it. Draw another or Auto-fill.");
+        }
       });
-
-      $("autoFillBtn").addEventListener("click", autoFillSelected);
-      $("clearPanelsBtn").addEventListener("click", clearPanelsSelected);
-      $("resetBtn").addEventListener("click", resetEverything);
-      $("exportBtn").addEventListener("click", exportJSON);
 
       // click empty map to unselect
-      map.addListener("click", () => setSelectedArea(null));
+      map.addListener("click", () => unselectAll());
 
-      setMsg("Ready. Draw an area, select it, then Auto-fill.");
-      updateStats();
-    };
+      // UI hooks
+      document.getElementById("btnGoCoords").addEventListener("click", goToCoords);
+      document.getElementById("coords").addEventListener("keydown", (e) => { if (e.key === "Enter") goToCoords(); });
+
+      document.getElementById("btnDrawArea").addEventListener("click", () => startDraw(DRAW_AREA));
+      document.getElementById("btnDrawWalk").addEventListener("click", () => startDraw(DRAW_WALK));
+      document.getElementById("btnStopDraw").addEventListener("click", stopDraw);
+
+      document.getElementById("btnFill").addEventListener("click", autoFillSelected);
+      document.getElementById("btnClearAreaPanels").addEventListener("click", clearPanelsSelected);
+      document.getElementById("btnDeleteSelected").addEventListener("click", deleteSelected);
+      document.getElementById("btnReset").addEventListener("click", resetEverything);
+      document.getElementById("btnExport").addEventListener("click", exportJSON);
+
+      updateTotalPanels();
+      updateSelectedInfo();
+      setHint("Ready. Click 'Draw Roof / Ground Area' to start.");
+    }
   </script>
 
-  <!-- Replace with your Maps JavaScript API key -->
+  <!-- IMPORTANT:
+       1) Put your Google Maps JavaScript API key below.
+       2) Ensure Maps JavaScript API is enabled in Google Cloud.
+       3) Ensure the key allows your Vercel domain in HTTP referrers. -->
   <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjYkseGZMK9Ej_NiWsMZwsL72MPtIur3g&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=PASTE_YOUR_MAPS_JS_API_KEY_HERE&libraries=drawing&callback=initMap">
   </script>
 </body>
 </html>
