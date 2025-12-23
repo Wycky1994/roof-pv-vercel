@@ -1,8 +1,13 @@
 <!doctype html>
+<!--
+  PV Layout PRO (Multi Areas + Auto Walkways + Meter-based Auto-Fill)
+  Author: Wycliffe Wanyonyi
+-->
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>PV Layout PRO (Multi Areas + Walkways + Meter-based Auto-Fill)</title>
+  <title>PV Layout PRO (Multi Areas + Auto Walkways + Meter-based Auto-Fill)</title>
+  <meta name="author" content="Wycliffe Wanyonyi" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
@@ -13,7 +18,7 @@
       background:rgba(255,255,255,0.94);
       padding:10px 12px; border-radius:12px;
       box-shadow:0 8px 22px rgba(0,0,0,0.18);
-      z-index:5; width:410px;
+      z-index:5; width:430px;
       max-height:calc(100% - 24px);
       overflow:auto;
     }
@@ -62,8 +67,9 @@
 <body>
   <div class="panel">
     <div class="sectionTitle" style="border-top:none; padding-top:0; margin-top:0;">
-      Find location
+      Find location <span class="badge">Author: Wycliffe Wanyonyi</span>
     </div>
+
     <div class="row">
       <div style="flex:1.6;">
         <label>Coordinates (lat, lng)</label>
@@ -105,11 +111,11 @@
 
     <div class="row">
       <div>
-        <label>Panel Orientation</label>
+        <label>Panel Orientation (matches your expectation)</label>
         <select id="orient">
           <option value="auto" selected>Auto (best)</option>
-          <option value="portrait">Portrait</option>
-          <option value="landscape">Landscape</option>
+          <option value="portrait">Portrait (long side along roof length)</option>
+          <option value="landscape">Landscape (long side across roof)</option>
         </select>
       </div>
       <div>
@@ -158,29 +164,42 @@
       </div>
     </div>
 
-    <div class="sectionTitle">Draw / Actions</div>
+    <div class="sectionTitle">Walkways (Auto)</div>
+    <div class="row">
+      <div>
+        <label>Walkway width (m)</label>
+        <input id="walkW" type="number" step="0.1" value="0.6">
+      </div>
+      <div>
+        <label>Spacing (m) for long roofs</label>
+        <input id="walkSpacing" type="number" step="0.5" value="6">
+      </div>
+    </div>
+    <div class="row">
+      <div><button id="btnAutoWalk">Auto Walkways (Selected AREA)</button></div>
+      <div><button id="btnDrawWalk">Draw WALKWAY / NO-GO (Manual)</button></div>
+    </div>
 
+    <div class="sectionTitle">Draw / Actions</div>
     <div class="row">
       <div><button id="btnDrawArea">Draw NEW Roof / Ground AREA</button></div>
-      <div><button id="btnDrawWalk">Draw WALKWAY / NO-GO</button></div>
-    </div>
-
-    <div class="row">
       <div><button class="primary" id="btnFill">Auto-fill (Selected AREA)</button></div>
-      <div><button id="btnClearPanels">Clear Panels (Selected AREA)</button></div>
     </div>
 
     <div class="row">
+      <div><button id="btnClearPanels">Clear Panels (Selected AREA)</button></div>
       <div><button id="btnDeleteSelected">Delete Selected Shape</button></div>
-      <div><button id="btnExport">Export JSON</button></div>
     </div>
 
-    <button class="danger" id="btnReset">RESET (Clear Everything)</button>
+    <div class="row">
+      <div><button id="btnExport">Export JSON</button></div>
+      <div><button class="danger" id="btnReset">RESET (Clear Everything)</button></div>
+    </div>
 
     <small>
       <span class="pill">1</span> Draw an AREA polygon → click it to select.<br/>
-      <span class="pill">2</span> Draw WALKWAY/NO-GO polygons (panels avoid them).<br/>
-      <span class="pill">3</span> Auto-fill selected area. Draw another area: previous stays.
+      <span class="pill">2</span> Auto Walkways (optional) → panels avoid them.<br/>
+      <span class="pill">3</span> Auto-fill selected area. Draw next roof side: previous stays.
     </small>
 
     <div id="stats" class="stats"></div>
@@ -229,7 +248,7 @@
       clearSelectionStyles();
       areaObj.polygon.setOptions({ strokeWeight: 4 });
       updateSelBadge();
-      setHint("AREA selected. Click Auto-fill.");
+      setHint("AREA selected. Auto-fill and/or Auto Walkways are now available.");
     }
 
     function selectWalk(poly){
@@ -385,7 +404,7 @@
       return {minX, minY, maxX, maxY};
     }
 
-    // Find longest edge direction of a polygon in meters -> angle from East/X (deg)
+    // Find longest edge direction (deg from East/X), normalized 0..180
     function longestEdgeAngleDegFromX(mPoly){
       let bestLen=-1, bestAng=0;
       for(let i=0; i<mPoly.length; i++){
@@ -394,12 +413,10 @@
         const len=Math.hypot(dx,dy);
         if(len>bestLen){
           bestLen=len;
-          bestAng = Math.atan2(dy,dx) * 180/Math.PI; // from +X
+          bestAng = Math.atan2(dy,dx) * 180/Math.PI;
         }
       }
-      // normalize 0..180
-      bestAng = ((bestAng % 180) + 180) % 180;
-      return bestAng;
+      return ((bestAng % 180) + 180) % 180;
     }
 
     // =========================
@@ -416,7 +433,7 @@
     }
 
     // =========================
-    // SOLVER (same idea as your working code)
+    // SOLVER
     // =========================
     function solveFor(pLen, pWid, anglesDeg, roofM, noGoM, gap, setback, mountType, roofTilt, minSunEl, rowGap) {
       const c = centroid(roofM);
@@ -443,6 +460,7 @@
             panels.push({ angDeg, cornersM });
           }
         }
+
         if (!best || panels.length > best.count) best = { angDeg, count: panels.length, panels, stepY };
       }
       return best;
@@ -478,6 +496,112 @@
     }
 
     // =========================
+    // AUTO WALKWAYS (heuristic)
+    // =========================
+    function addWalkwayRectInRotFrame(x, y, w, h, refLat, refLng, cM, angRad){
+      // rectangle in rotated frame -> rotate back -> to LatLng -> polygon
+      const cornersR = rectCorners(x, y, w, h);
+      const cornersM = cornersR.map(pt => rotatePoint(pt, cM, +angRad));
+      const llCorners = cornersM.map(m => {
+        const ll = metersToLatLng(m.x, m.y, refLat, refLng);
+        return new google.maps.LatLng(ll.lat, ll.lng);
+      });
+
+      const poly = new google.maps.Polygon({
+        paths: llCorners,
+        map,
+        fillColor: "#ff3355",
+        fillOpacity: 0.22,
+        strokeColor: "#ff3355",
+        strokeWeight: 2,
+        editable: true
+      });
+      walkways.push(poly);
+      poly.addListener("click", () => selectWalk(poly));
+    }
+
+    function autoWalkwaysSelectedArea(){
+      if(!selected || selected.type !== "area"){
+        alert("Select an AREA first."); return;
+      }
+
+      const areaObj = selected.obj;
+
+      const walkW = parseFloat(document.getElementById("walkW").value);
+      const spacing = parseFloat(document.getElementById("walkSpacing").value);
+      if(!Number.isFinite(walkW) || walkW <= 0.1){ alert("Walkway width invalid."); return; }
+      if(!Number.isFinite(spacing) || spacing < 2){ alert("Spacing invalid."); return; }
+
+      const roofPathLL = areaObj.polygon.getPath().getArray();
+      const refLat = roofPathLL[0].lat();
+      const refLng = roofPathLL[0].lng();
+      const roofM = roofPathLL.map(ll => latLngToMeters(ll.lat(), ll.lng(), refLat, refLng));
+      const cM = centroid(roofM);
+
+      // Use same "auto" direction: longest edge
+      const preferredDeg = longestEdgeAngleDegFromX(roofM);
+      const angRad = preferredDeg * Math.PI/180;
+
+      // rotate roof to axis frame
+      const roofR = rotatePoly(roofM, cM, -angRad);
+      const bb = bbox(roofR);
+
+      const width = (bb.maxX - bb.minX);
+      const height = (bb.maxY - bb.minY);
+
+      // Heuristic:
+      // - If roof is very long in X, add cross-walkways in Y every spacing
+      // - If roof is very long in Y, add cross-walkways in X every spacing
+      // - If extremely long, add a central corridor along long axis
+      let added = 0;
+
+      const longAxisIsX = width >= height;
+      const longLen = longAxisIsX ? width : height;
+      const shortLen = longAxisIsX ? height : width;
+
+      // central corridor (only if huge long roof)
+      if(longLen >= 20 && shortLen >= (walkW * 2.2)){
+        if(longAxisIsX){
+          const yMid = (bb.minY + bb.maxY)/2 - walkW/2;
+          addWalkwayRectInRotFrame(bb.minX, yMid, width, walkW, refLat, refLng, cM, angRad);
+        } else {
+          const xMid = (bb.minX + bb.maxX)/2 - walkW/2;
+          addWalkwayRectInRotFrame(xMid, bb.minY, walkW, height, refLat, refLng, cM, angRad);
+        }
+        added++;
+      }
+
+      // periodic cross-walkways
+      if(longLen >= 12){
+        const count = Math.floor(longLen / spacing);
+        if(count >= 1){
+          for(let k=1; k<=count; k++){
+            const t = k*spacing;
+            if(longAxisIsX){
+              // cross walkway is vertical strip in X at position
+              const x = bb.minX + t - (walkW/2);
+              if(x <= bb.minX + 0.5 || x >= bb.maxX - 0.5) continue;
+              addWalkwayRectInRotFrame(x, bb.minY, walkW, height, refLat, refLng, cM, angRad);
+            } else {
+              // cross walkway is horizontal strip in Y at position
+              const y = bb.minY + t - (walkW/2);
+              if(y <= bb.minY + 0.5 || y >= bb.maxY - 0.5) continue;
+              addWalkwayRectInRotFrame(bb.minX, y, width, walkW, refLat, refLng, cM, angRad);
+            }
+            added++;
+          }
+        }
+      }
+
+      if(added === 0){
+        setHint("Auto Walkways: area too small for auto corridors. Use manual walkway or lower spacing.");
+      } else {
+        setHint(`Auto Walkways added: ${added}. Panels will avoid them. Re-run Auto-fill.`);
+      }
+      setStats(`Walkways: ${walkways.length} | TOTAL panels: ${totalPanelCount()}`);
+    }
+
+    // =========================
     // AUTO-FILL (Selected area)
     // =========================
     function autoFillSelectedArea(){
@@ -504,7 +628,7 @@
         rowGap: parseFloat(document.getElementById("rowGap").value)
       };
 
-      if(![inp.pLen0, inp.pWid0, inp.gap, inp.setback].every(Number.isFinite)){
+      if(![inp.pLen0, inp.pWid0, inp.gap, inp.setback, inp.angleStep].every(Number.isFinite)){
         alert("Check your numeric inputs."); return;
       }
 
@@ -514,18 +638,24 @@
 
       const roofM = roofPathLL.map(ll => latLngToMeters(ll.lat(), ll.lng(), refLat, refLng));
 
-      // Global walkways/no-go apply to this area too
+      // Global walkways/no-go apply to this area
       const noGoM = walkways.map(pg =>
         pg.getPath().getArray().map(ll => latLngToMeters(ll.lat(), ll.lng(), refLat, refLng))
       );
 
-      // orientations
+      // ✅ ORIENTATION MAPPING UPDATED:
+      // Portrait = long side along roof length / fill direction (what you expect)
+      // Landscape = long side across roof
       const candidates = [];
-      if (inp.orient === "portrait") candidates.push({name:"portrait", pLen: inp.pLen0, pWid: inp.pWid0});
-      else if (inp.orient === "landscape") candidates.push({name:"landscape", pLen: inp.pWid0, pWid: inp.pLen0});
-      else {
-        candidates.push({name:"portrait", pLen: inp.pLen0, pWid: inp.pWid0});
-        candidates.push({name:"landscape", pLen: inp.pWid0, pWid: inp.pLen0});
+      if (inp.orient === "portrait") {
+        // portrait -> width gets LONG side (along X in rotated frame)
+        candidates.push({name:"portrait", pLen: inp.pWid0, pWid: inp.pLen0});
+      } else if (inp.orient === "landscape") {
+        candidates.push({name:"landscape", pLen: inp.pLen0, pWid: inp.pWid0});
+      } else {
+        // auto: try both
+        candidates.push({name:"portrait",  pLen: inp.pWid0, pWid: inp.pLen0});
+        candidates.push({name:"landscape", pLen: inp.pLen0, pWid: inp.pWid0});
       }
 
       // angles
@@ -575,9 +705,9 @@
       drawPanels(bestOverall.panels, refLat, refLng, areaObj);
 
       const rowPitchTxt = (inp.mountType === "tilted") ? ` | Row pitch: ${bestOverall.rowPitchY.toFixed(2)} m` : "";
-      setStats(`Selected ${areaObj.id} → Panels: ${bestOverall.count} | ${bestOverall.orientation} | Rotation: ${bestOverall.angDeg.toFixed(1)}°` + rowPitchTxt
-        + ` | TOTAL: ${totalPanelCount()}`);
-      setHint("Tip: Draw another area (next roof side) — previous areas will remain.");
+      setStats(`Selected ${areaObj.id} → Panels: ${bestOverall.count} | ${bestOverall.orientation} | Rotation: ${bestOverall.angDeg.toFixed(1)}°`
+        + rowPitchTxt + ` | Walkways: ${walkways.length} | TOTAL: ${totalPanelCount()}`);
+      setHint("If you add walkways, re-run Auto-fill to apply them.");
     }
 
     function clearSelectedPanels(){
@@ -631,6 +761,7 @@
 
     function exportJSON(){
       const out = {
+        author: "Wycliffe Wanyonyi",
         timestamp: new Date().toISOString(),
         areas: areas.map(a => ({
           id: a.id,
@@ -692,12 +823,11 @@
           poly.addListener("click", () => selectArea(areaObj));
           selectArea(areaObj);
 
-          // stop drawing mode (less accidental polygons)
           drawingManager.setDrawingMode(null);
           drawMode = DRAW_NONE;
 
-          setHint("Area saved. Click Auto-fill. Then draw the next roof side: previous stays.");
-          setStats(`Areas: ${areas.length} | TOTAL panels: ${totalPanelCount()}`);
+          setHint("Area saved. You can Auto Walkways or Auto-fill now.");
+          setStats(`Areas: ${areas.length} | Walkways: ${walkways.length} | TOTAL panels: ${totalPanelCount()}`);
         }
 
         if (drawMode === DRAW_WALK) {
@@ -716,7 +846,7 @@
           drawingManager.setDrawingMode(null);
           drawMode = DRAW_NONE;
 
-          setHint("Walkway/no-go saved. Panels will avoid it. Re-run Auto-fill for any area.");
+          setHint("Walkway/no-go saved. Panels will avoid it. Re-run Auto-fill.");
           setStats(`Walkways: ${walkways.length} | TOTAL panels: ${totalPanelCount()}`);
         }
       });
@@ -739,6 +869,8 @@
         setHint("Draw WALKWAY/NO-GO polygon and close it.");
       });
 
+      document.getElementById("btnAutoWalk").addEventListener("click", autoWalkwaysSelectedArea);
+
       document.getElementById("btnFill").addEventListener("click", autoFillSelectedArea);
       document.getElementById("btnClearPanels").addEventListener("click", clearSelectedPanels);
       document.getElementById("btnDeleteSelected").addEventListener("click", deleteSelected);
@@ -746,7 +878,7 @@
       document.getElementById("btnExport").addEventListener("click", exportJSON);
 
       updateSelBadge();
-      setHint("Ready. Draw an AREA, click it to select, then Auto-fill.");
+      setHint("Ready. Draw an AREA, click it to select, then Auto Walkways (optional) and Auto-fill.");
     }
   </script>
   </script>
